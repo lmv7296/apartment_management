@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "name": "Cozy Apartment",
+    "address": "123 Main St, Springfield, IL",
+    "price": 250000,
+    "type": "buy",
+    "image": "/images/cozy_apartment.jpg",
+    "bedrooms": 2,
+    "bathrooms": 1,
+    "squareFeet": 800,
+    "features": ["balcony", "parking", "gym"]
+  },
+  {
+    "id": 2,
+    "name": "Modern Loft",
+    "address": "456 Elm St, Springfield, IL",
+    "price": 1500,
+    "type": "rent",
+    "image": "/images/modern_loft.jpg",
+    "bedrooms": 1,
+    "bathrooms": 1,
+    "squareFeet": 600,
+    "features": ["open floor plan", "high ceilings", "rooftop access"]
+  },
+  {
+    "id": 3,
+    "name": "Family Home",
+    "address": "789 Oak St, Springfield, IL",
+    "price": 350000,
+    "type": "buy",
+    "image": "/images/family_home.jpg",
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "squareFeet": 1200,
+    "features": ["backyard", "garage", "fireplace"]
+  },
+  {
+    "id": 4,
+    "name": "Studio Apartment",
+    "address": "321 Pine St, Springfield, IL",
+    "price": 900,
+    "type": "rent",
+    "image": "/images/studio_apartment.jpg",
+    "bedrooms": 0,
+    "bathrooms": 1,
+    "squareFeet": 400,
+    "features": ["furnished", "close to public transport"]
+  }
+]
