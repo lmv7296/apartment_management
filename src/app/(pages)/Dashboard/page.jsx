@@ -2,7 +2,7 @@
 
 import React from "react";
 
-export default function HomePage() {
+export default function Dashboard() {
   const [role, setRole] = React.useState();
 
   return (
