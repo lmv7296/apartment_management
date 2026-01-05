@@ -1,0 +1,44 @@
+{
+    "users": [
+        {
+            "id": "user-001",
+            "name": "John Doe",
+            "email": "john.doe@example.com",
+            "phone": "+1-555-0101",
+            "apartmentId": "apt-101",
+            "role": "tenant",
+            "createdAt": "2023-01-15T10:00:00Z",
+            "active": true
+        },
+        {
+            "id": "user-002",
+            "name": "Jane Smith",
+            "email": "jane.smith@example.com",
+            "phone": "+1-555-0102",
+            "apartmentId": "apt-102",
+            "role": "tenant",
+            "createdAt": "2023-02-20T14:30:00Z",
+            "active": true
+        },
+        {
+            "id": "user-003",
+            "name": "Mike Johnson",
+            "email": "mike.johnson@example.com",
+            "phone": "+1-555-0103",
+            "apartmentId": null,
+            "role": "manager",
+            "createdAt": "2023-01-01T08:00:00Z",
+            "active": true
+        },
+        {
+            "id": "user-004",
+            "name": "Sarah Williams",
+            "email": "sarah.williams@example.com",
+            "phone": "+1-555-0104",
+            "apartmentId": "apt-101",
+            "role": "tenant",
+            "createdAt": "2023-03-10T11:45:00Z",
+            "active": false
+        }
+    ]
+}
