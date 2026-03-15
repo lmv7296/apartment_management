@@ -1,1 +1,116 @@
 @import "tailwindcss";
+/* Suggested App Color Scheme */
+/* Use as CSS variables in globals.css */
+
+:root {
+  /* LIGHT MODE */
+  --bg: #f7fafc;
+  --surface: #ffffff;
+  --surface-2: #edf3ff;
+  --text: #000000;
+  --text-muted: #334155;
+  --border: #d9e5ff;
+
+  --primary: #2f6bff;
+  --primary-hover: #2458d9;
+  --accent: #00b8ff;
+  --accent-2: #7a4dff;
+
+  --success: #00c787;
+  --warning: #f7b731;
+  --danger: #ff5478;
+  --info: #1ca7ff;
+
+  --tone-high-border: var(--danger);
+  --tone-high-bg: rgba(255, 84, 120, 0.22);
+  --tone-high-text: #7a1028;
+
+  --tone-medium-border: var(--warning);
+  --tone-medium-bg: rgba(247, 183, 49, 0.28);
+  --tone-medium-text: #5b3a00;
+
+  --tone-low-border: var(--info);
+  --tone-low-bg: rgba(28, 167, 255, 0.22);
+  --tone-low-text: #003a5c;
+
+  --shadow: 0 14px 38px rgba(47, 107, 255, 0.12);
+}
+
+.dark {
+  /* DARK MODE */
+  --bg: #020617;
+  --surface: #111b32;
+  --surface-2: #172542;
+  --text: #ffffff;
+  --text-muted: #cbd5e1;
+  --border: #243557;
+
+  --primary: #35c2ff;
+  --primary-hover: #24ace8;
+  --accent: #4f7dff;
+  --accent-2: #8f6bff;
+
+  --success: #35daa3;
+  --warning: #ffc95a;
+  --danger: #ff7c97;
+  --info: #5dcfff;
+
+  --tone-high-border: var(--danger);
+  --tone-high-bg: rgba(255, 124, 151, 0.24);
+  --tone-high-text: #ffe1e8;
+
+  --tone-medium-border: var(--warning);
+  --tone-medium-bg: rgba(255, 201, 90, 0.24);
+  --tone-medium-text: #fff2d0;
+
+  --tone-low-border: var(--info);
+  --tone-low-bg: rgba(93, 207, 255, 0.24);
+  --tone-low-text: #dff6ff;
+
+  --shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  background-image: none;
+}
+
+.app-surface {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+.app-surface-2 {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.app-text-muted {
+  color: var(--text-muted);
+}
+
+.logo-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  box-shadow: var(--shadow);
+  padding: 0.125rem;
+}
+
+.logo-glyph {
+  width: 92%;
+  height: 92%;
+  color: var(--text);
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 35%, transparent);
+  color: var(--text);
+}

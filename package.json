@@ -4,15 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --turbopack --hostname 0.0.0.0 --port 3000",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:reset-user-passwords": "set -a && source .env.local && set +a && node scripts/reset-user-passwords.mjs"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
     "cookie": "^1.1.1",
     "dotenv": "^17.2.3",
     "next": "15.2.2",
+    "next-auth": "^4.24.13",
     "pg": "^8.16.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

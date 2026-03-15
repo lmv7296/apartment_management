@@ -1,141 +1,161 @@
 "use client";
 
 import Link from "next/link";
-import Header from "./components/header";
-import Card from "./components/card";
-import React from "react";
 
-const features = [
+const featurePillars = [
   {
     id: 1,
-    title: "Centralized Contracts",
-    desc: "Store, version and e-sign lease documents for every unit.",
+    title: "Leasing Control Center",
+    desc: "Track leases, renewals, and expiring agreements in one timeline.",
+    metric: "98% on-time renewals",
   },
   {
     id: 2,
-    title: "Maintenance Queue",
-    desc: "Track requests, assign vendors, and monitor costs.",
+    title: "Maintenance Command",
+    desc: "Prioritize tickets by urgency, assign vendors, and watch SLA health.",
+    metric: "2.1 day avg resolution",
   },
   {
     id: 3,
-    title: "Tenant Records",
-    desc: "One place for contact info, payment history and documents.",
+    title: "Tenant Relationship Hub",
+    desc: "Unify communication, payment history, and documents per resident.",
+    metric: "All tenant history searchable",
   },
   {
     id: 4,
-    title: "Payments & Accounting",
-    desc: "Collect rent, reconcile payments and export reports.",
-  },
-  {
-    id: 5,
-    title: "Multi-Admin Access",
-    desc: "Granular roles and permissions for teams and vendors.",
-  },
-  {
-    id: 6,
-    title: "Reports & Exports",
-    desc: "Financial, maintenance and occupancy reports ready for export.",
+    title: "Revenue Visibility",
+    desc: "See collected rent, delinquency risk, and cash movement in real-time.",
+    metric: "Live payment tracking",
   },
 ];
 
+const highlights = [
+  { id: 1, label: "Units Managed", value: "1,240+" },
+  { id: 2, label: "Monthly Collections", value: "$2.8M" },
+  { id: 3, label: "Avg Occupancy", value: "94.6%" },
+];
+
 export default function Home() {
-  // const [data, setData] = React.useState(null);
-  // console.log(data);
-  // React.useEffect(() => {
-  //   async function fetchData() {
-  //     // Call your Next.js API route using a relative path
-  //     const response = await fetch("/api/listings");
-  //     const result = await response.json();
-  //     setData(result);
-  //   }
-
-  //   fetchData();
-  // }, []);
-  // // const posts = await data.json();
-  // const items = Array.isArray(data)
-  //   ? data.map((p) => ({
-  //       id: p.id,
-  //       image: p.image,
-  //       title: p.name,
-  //       info: `${p.bedrooms} bd • ${p.bathrooms} ba • ${p.squareFeet} sqft`,
-  //       price:
-  //         p.type === "rent"
-  //           ? `$${p.price}/mo`
-  //           : `$${new Intl.NumberFormat().format(p.price)}`,
-  //     }))
-  //   : [];
-
   return (
-    <>
-      <Header />
-
-      <main className="max-w-4xl mx-auto p-6">
-        <section className="text-center py-12">
-          <h1 className="text-4xl font-bold mb-4">Portfolio Admin Platform</h1>
-          <p className="text-lg text-gray-600 mb-6">
-            Built for landlords and property managers who operate many units —
-            centralize contracts, tenants, maintenance and payments across your
-            entire portfolio.
+    <main className='mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8'>
+      <section
+        className='relative overflow-hidden rounded-3xl border p-8 sm:p-12'
+        style={{
+          borderColor: "var(--border)",
+          background:
+            "linear-gradient(140deg, color-mix(in oklab, var(--surface) 92%, var(--accent) 8%), var(--surface))",
+          boxShadow: "var(--shadow)",
+        }}>
+        <div className='max-w-3xl'>
+          <p
+            className='mb-4 inline-flex rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider'
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--accent-2)",
+              backgroundColor: "var(--surface-2)",
+            }}>
+            Built for Multi-Property Teams
           </p>
-          <div className="flex gap-4 justify-center">
-            <Link
-              href="/demo"
-              className="px-4 py-2 bg-blue-600 text-white rounded"
-            >
-              Request Demo
-            </Link>
-            <Link href="/signup" className="px-4 py-2 border rounded">
-              Create Account
-            </Link>
-            <Link href="/docs" className="px-4 py-2 border rounded">
-              Documentation
-            </Link>
-          </div>
-        </section>
-        {/* 
-        <section className="mt-8">
-          <h2 className="text-2xl font-semibold mb-4 text-center">
-            my Apartments
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {items.map((item) => (
-              <Card
-                key={item.id}
-                image={item.image}
-                name={item.title}
-                info={`${item.info} • ${item.price}`}
-                onOpenFull={(name) => console.log("Open full view:", name)}
-              />
-            ))}
-          </div>
-        </section> */}
 
-        <section className="mt-8">
-          <h2 className="text-2xl font-semibold mb-4 text-center">
-            What it does for your team
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {features.map((f) => (
-              <div key={f.id} className="border rounded p-4 shadow-sm">
-                <h3 className="font-semibold mb-2">{f.title}</h3>
-                <p className="text-sm text-gray-600">{f.desc}</p>
+          <h1 className='text-4xl font-black leading-tight sm:text-5xl'>
+            Run Every Building Like One Cohesive Operation
+          </h1>
+
+          <p className='mt-4 max-w-2xl text-base sm:text-lg app-text-muted'>
+            Apartment Manager gives owners and operators one command layer for
+            leasing, maintenance, tenant communication, and rent performance.
+          </p>
+
+          <div className='mt-6 flex flex-wrap gap-3'>
+            <Link
+              href='/Dashboard'
+              className='rounded-full px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-110'
+              style={{
+                background:
+                  "linear-gradient(90deg, var(--accent), var(--primary))",
+              }}>
+              Open Dashboard
+            </Link>
+            <Link
+              href='/Login'
+              className='rounded-full border px-5 py-2.5 text-sm font-bold'
+              style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+              Sign In
+            </Link>
+          </div>
+
+          <div className='mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3'>
+            {highlights.map((item) => (
+              <div
+                key={item.id}
+                className='rounded-2xl border p-4'
+                style={{
+                  borderColor: "var(--border)",
+                  backgroundColor: "var(--surface)",
+                }}>
+                <p className='text-xs uppercase tracking-wide app-text-muted'>
+                  {item.label}
+                </p>
+                <p className='mt-1 text-2xl font-black'>{item.value}</p>
               </div>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="mt-10 text-center">
-          <h2 className="text-xl font-semibold mb-2">Security & Scale</h2>
-          <p className="text-gray-600 mb-4">
-            Role-based access, audit logs, and data export tools let multiple
-            admins and vendors collaborate safely at scale.
-          </p>
-        </section>
-      </main>
+      <section className='grid grid-cols-1 gap-4 md:grid-cols-2'>
+        {featurePillars.map((pillar) => (
+          <article
+            key={pillar.id}
+            className='rounded-2xl border p-5'
+            style={{
+              borderColor: "var(--border)",
+              backgroundColor: "var(--surface)",
+              boxShadow: "var(--shadow)",
+            }}>
+            <h2 className='text-xl font-bold'>{pillar.title}</h2>
+            <p className='mt-2 text-sm app-text-muted'>{pillar.desc}</p>
+            <p
+              className='mt-4 text-sm font-semibold'
+              style={{ color: "var(--accent)" }}>
+              {pillar.metric}
+            </p>
+          </article>
+        ))}
+      </section>
 
-      <footer className="py-8 text-center text-sm text-gray-500">
-        © {new Date().getFullYear()} Apartment Management
-      </footer>
-    </>
+      <section
+        className='rounded-3xl border px-6 py-8 text-center sm:px-10'
+        style={{
+          borderColor: "var(--border)",
+          backgroundColor: "var(--surface)",
+          boxShadow: "var(--shadow)",
+        }}>
+        <h2 className='text-2xl font-black sm:text-3xl'>
+          Ready to simplify operations this month?
+        </h2>
+        <p className='mx-auto mt-3 max-w-2xl app-text-muted'>
+          Start with one building or your full portfolio. Keep your team aligned
+          on what matters most: occupancy, resident satisfaction, and cash flow.
+        </p>
+        <div className='mt-6 flex flex-wrap justify-center gap-3'>
+          <Link
+            href='/Dashboard'
+            className='rounded-full px-6 py-2.5 text-sm font-bold text-white transition hover:brightness-110'
+            style={{
+              background:
+                "linear-gradient(90deg, var(--accent-2), var(--primary))",
+            }}>
+            View Product
+          </Link>
+          <Link
+            href='/Login'
+            className='rounded-full border px-6 py-2.5 text-sm font-bold'
+            style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+            Access Portal
+          </Link>
+        </div>
+      </section>
+    </main>
   );
 }

@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Apartment Management - PostgreSQL Setup
 
-## Getting Started
+This project now uses PostgreSQL for auth, listings, sign-up, and dashboard data.
 
-First, run the development server:
+## Prerequisites
+
+- Node.js 20+
+- PostgreSQL running locally
+- A database created (example: apManagement)
+
+## Environment Variables
+
+Use your existing .env.local and confirm values for your machine.
+
+Required values:
+
+- NEXTAUTH_SECRET
+- NEXTAUTH_DEMO_PASSWORD
+- PGHOST
+- PGPORT
+- PGUSER
+- PGPASSWORD
+- PGDATABASE
+
+## Install Dependencies
+
+```bash
+npm install
+```
+
+## Initialize Database
+
+Run schema then seed:
+
+```bash
+psql -h 127.0.0.1 -p 5432 -U postgres -d apManagement -f db/schema.sql
+psql -h 127.0.0.1 -p 5432 -U postgres -d apManagement -f db/seed.sql
+```
+
+If your connection values differ, update the command flags accordingly.
+
+## Run App
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App URL: http://localhost:3000
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## API Endpoints (PostgreSQL-backed)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- GET /api/v1/listings
+- POST /api/v1/signIn
+- POST /api/v1/signup
+- GET /api/v1/dashboard
+- NextAuth credentials provider: /api/auth/[...nextauth]
 
-## Learn More
+## Demo Login
 
-To learn more about Next.js, take a look at the following resources:
+- Use any active user email from seeded users
+- Use NEXTAUTH_DEMO_PASSWORD as the password
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Seeded active users include:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- john.doe@example.com
+- jane.smith@example.com
+- lvredeveld9@gmail.com
 
-## Deploy on Vercel
+## Notes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Sign-up now persists to PostgreSQL.
+- Sign-in still uses temporary demo-password behavior for all users.
+- Password hashing is intentionally deferred for a hardening pass.
