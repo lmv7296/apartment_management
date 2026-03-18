@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import LogoMark from "./logo-mark";
 
@@ -9,6 +9,25 @@ export default function Header() {
   const { data: session, status } = useSession();
   const isAuthenticated = status === "authenticated";
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target)
+      ) {
+        setIsProfileMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   function closeMobileMenu() {
     setIsMobileMenuOpen(false);
@@ -106,26 +125,53 @@ export default function Header() {
           />
 
           {isAuthenticated ? (
-            <>
-              <span
-                className='hidden rounded-full px-3 py-2 text-sm sm:block'
+            <div className='relative' ref={profileMenuRef}>
+              <button
+                type='button'
+                onClick={() => setIsProfileMenuOpen((current) => !current)}
+                className='hidden rounded-full px-3 py-2 text-sm font-semibold sm:inline-flex sm:items-center sm:gap-2'
                 style={{
                   backgroundColor: "var(--surface-2)",
                   color: "var(--text)",
                 }}>
-                {session?.user?.name}
-              </span>
-              <button
-                type='button'
-                onClick={() => signOut({ callbackUrl: "/" })}
-                className='rounded-full px-5 py-2 text-sm font-bold text-white transition hover:brightness-110'
-                style={{
-                  background:
-                    "linear-gradient(90deg, color-mix(in oklab, var(--danger) 85%, #ffffff 0%), color-mix(in oklab, var(--warning) 75%, #ffffff 0%))",
-                }}>
-                Sign out
+                <span>{session?.user?.name}</span>
+                <span aria-hidden='true'>{isProfileMenuOpen ? "▲" : "▼"}</span>
               </button>
-            </>
+
+              {isProfileMenuOpen ? (
+                <div
+                  className='absolute right-0 mt-2 w-44 rounded-xl border p-1.5'
+                  style={{
+                    borderColor: "var(--border)",
+                    backgroundColor: "var(--surface)",
+                    boxShadow: "var(--shadow)",
+                  }}>
+                  <Link
+                    href='/Settings'
+                    onClick={() => setIsProfileMenuOpen(false)}
+                    className='block rounded-lg px-3 py-2 text-sm font-semibold'
+                    style={{
+                      color: "var(--text)",
+                      backgroundColor: "var(--surface-2)",
+                    }}>
+                    Settings
+                  </Link>
+                  <button
+                    type='button'
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      signOut({ callbackUrl: "/" });
+                    }}
+                    className='mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm font-semibold'
+                    style={{
+                      color: "var(--danger)",
+                      backgroundColor: "var(--surface-2)",
+                    }}>
+                    Sign out
+                  </button>
+                </div>
+              ) : null}
+            </div>
           ) : (
             <Link
               href='/Login'
@@ -170,6 +216,16 @@ export default function Header() {
                     backgroundColor: "var(--surface-2)",
                   }}>
                   Dashboard
+                </Link>
+                <Link
+                  href='/Settings'
+                  onClick={closeMobileMenu}
+                  className='rounded-lg px-3 py-2 text-sm font-semibold'
+                  style={{
+                    color: "var(--text)",
+                    backgroundColor: "var(--surface-2)",
+                  }}>
+                  Settings
                 </Link>
                 <p className='px-1 text-xs app-text-muted'>
                   Signed in as {session?.user?.name}

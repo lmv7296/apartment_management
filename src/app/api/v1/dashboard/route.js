@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import { query } from "@/lib/db";
+import { authOptions } from "@/lib/auth-options";
 
 function formatRelativeTime(dateString) {
   const value = new Date(dateString).getTime();
@@ -29,6 +31,15 @@ function formatRelativeTime(dateString) {
 
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id || null;
+    const apartmentId = session?.user?.apartmentId || null;
+    const role = String(session?.user?.role || "tenant").toLowerCase();
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const [
       propertyStats,
       paymentStats,
@@ -101,6 +112,109 @@ export async function GET() {
       time: formatRelativeTime(item.occurred_at),
     }));
 
+    const portfolioQuery =
+      role === "manager"
+        ? {
+            text: `
+              SELECT
+                p.id AS "propertyId",
+                p.name AS "buildingName",
+                p.address,
+                p.city,
+                p.state,
+                u.id AS "unitId",
+                u.unit_code AS "unitCode",
+                COALESCE(u.occupied, FALSE) AS occupied,
+                l.status AS "leaseStatus",
+                tenant.name AS "tenantName"
+              FROM properties p
+              LEFT JOIN units u ON u.property_id = p.id
+              LEFT JOIN LATERAL (
+                SELECT lx.user_id, lx.status
+                FROM leases lx
+                WHERE lx.unit_id = u.id
+                ORDER BY
+                  CASE WHEN lx.status = 'active' THEN 0 ELSE 1 END,
+                  lx.end_date DESC NULLS LAST
+                LIMIT 1
+              ) l ON TRUE
+              LEFT JOIN users tenant ON tenant.id = l.user_id
+              ORDER BY p.name ASC, u.unit_code ASC
+            `,
+            values: [],
+          }
+        : {
+            text: `
+              SELECT
+                p.id AS "propertyId",
+                p.name AS "buildingName",
+                p.address,
+                p.city,
+                p.state,
+                u.id AS "unitId",
+                u.unit_code AS "unitCode",
+                COALESCE(u.occupied, FALSE) AS occupied,
+                l.status AS "leaseStatus",
+                tenant.name AS "tenantName"
+              FROM units u
+              INNER JOIN properties p ON p.id = u.property_id
+              LEFT JOIN LATERAL (
+                SELECT lx.user_id, lx.status
+                FROM leases lx
+                WHERE lx.unit_id = u.id
+                ORDER BY
+                  CASE WHEN lx.status = 'active' THEN 0 ELSE 1 END,
+                  lx.end_date DESC NULLS LAST
+                LIMIT 1
+              ) l ON TRUE
+              LEFT JOIN users tenant ON tenant.id = l.user_id
+              WHERE
+                ($1::text IS NOT NULL AND u.id::text = $1)
+                OR EXISTS (
+                  SELECT 1
+                  FROM leases ul
+                  WHERE ul.unit_id = u.id
+                    AND ul.user_id = $2
+                    AND ul.status = 'active'
+                )
+              ORDER BY p.name ASC, u.unit_code ASC
+            `,
+            values: [apartmentId, userId],
+          };
+
+    const portfolioRes = await query(
+      portfolioQuery.text,
+      portfolioQuery.values,
+    );
+    const buildingsMap = new Map();
+
+    for (const row of portfolioRes.rows) {
+      const existing = buildingsMap.get(row.propertyId);
+
+      if (!existing) {
+        buildingsMap.set(row.propertyId, {
+          id: row.propertyId,
+          name: row.buildingName,
+          address: row.address,
+          city: row.city,
+          state: row.state,
+          units: [],
+        });
+      }
+
+      if (row.unitId) {
+        buildingsMap.get(row.propertyId).units.push({
+          id: row.unitId,
+          code: row.unitCode || "-",
+          occupied: Boolean(row.occupied),
+          leaseStatus: row.leaseStatus || null,
+          tenantName: row.tenantName || null,
+        });
+      }
+    }
+
+    const portfolio = Array.from(buildingsMap.values());
+
     const alerts = [
       {
         id: "lease-expiring",
@@ -123,7 +237,7 @@ export async function GET() {
       },
     ];
 
-    return NextResponse.json({ metrics, alerts, activity });
+    return NextResponse.json({ metrics, alerts, activity, portfolio });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to load dashboard data", detail: error.message },

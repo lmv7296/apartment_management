@@ -1,0 +1,68 @@
+{
+  "dashboard": {
+    "manager": {
+      "quickActions": [
+        {
+          "id": "add-property",
+          "label": "+ Add Property",
+          "href": "/properties/new",
+          "className": "hover:brightness-110",
+          "style": {
+            "background": "linear-gradient(90deg, var(--accent), var(--primary))"
+          }
+        },
+        {
+          "id": "add-tenant",
+          "label": "+ Add Tenant",
+          "href": "/tenants/new",
+          "className": "hover:brightness-110",
+          "style": {
+            "background": "linear-gradient(90deg, var(--success), var(--accent))"
+          }
+        },
+        {
+          "id": "record-payment",
+          "label": "+ Record Payment",
+          "href": "/payments/new",
+          "className": "hover:brightness-110",
+          "style": {
+            "background": "linear-gradient(90deg, var(--accent-2), var(--primary))"
+          }
+        }
+      ]
+    },
+    "tenant": {
+      "quickActions": [
+        {
+          "id": "pay-rent",
+          "label": "Pay Rent",
+          "href": "/payments/new",
+          "className": "hover:brightness-110",
+          "style": {
+            "background": "linear-gradient(90deg, var(--success), var(--accent))"
+          }
+        },
+        {
+          "id": "new-request",
+          "label": "Request Maintenance",
+          "href": "/maintenance/new",
+          "className": "hover:brightness-110",
+          "style": {
+            "background": "linear-gradient(90deg, var(--accent-2), var(--primary))"
+          }
+        },
+        {
+          "id": "profile",
+          "label": "My Profile",
+          "href": "/profile",
+          "className": "hover:brightness-110",
+          "style": {
+            "background": "linear-gradient(90deg, var(--accent), var(--primary))"
+          }
+        }
+      ],
+      "overviewTitle": "Tenant Overview",
+      "overviewDescription": "This is the tenant-specific branch of the page. Keep personal lease, payments, and maintenance modules in this section."
+    }
+  }
+}

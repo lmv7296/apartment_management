@@ -1,0 +1,18 @@
+{
+  "defaultSettings": {
+    "currency": "USD",
+    "language": "en"
+  },
+  "currencies": [
+    { "code": "USD", "label": "US Dollar (USD)" },
+    { "code": "EUR", "label": "Euro (EUR)" },
+    { "code": "GBP", "label": "British Pound (GBP)" }
+  ],
+  "languages": [
+    { "code": "en", "label": "English" },
+    { "code": "es", "label": "Spanish" },
+    { "code": "nl", "label": "Dutch" },
+    { "code": "de", "label": "German" },
+    { "code": "fr", "label": "French" }
+  ]
+}
