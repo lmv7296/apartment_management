@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:reset-user-passwords": "set -a && source .env.local && set +a && node scripts/reset-user-passwords.mjs"
+    "db:reset-user-passwords": "set -a && . ./.env.local && set +a && node scripts/reset-user-passwords.mjs"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",

@@ -96,6 +96,59 @@ export async function GET() {
       }),
     };
 
+    let tenantPayment = null;
+
+    if (role === "tenant") {
+      const tenantPaymentRes = await query(
+        `
+          WITH scoped_payments AS (
+            SELECT p.amount, p.due_date, p.status
+            FROM payments p
+            WHERE p.user_id = $1
+               OR ($2::text IS NOT NULL AND p.unit_id::text = $2)
+          )
+          SELECT
+            (
+              SELECT sp.status
+              FROM scoped_payments sp
+              ORDER BY
+                CASE
+                  WHEN sp.status = 'overdue' THEN 0
+                  WHEN sp.status <> 'paid' AND sp.due_date <= CURRENT_DATE THEN 1
+                  WHEN sp.status <> 'paid' AND sp.due_date > CURRENT_DATE THEN 2
+                  ELSE 3
+                END,
+                sp.due_date ASC
+              LIMIT 1
+            ) AS "status",
+            (
+              SELECT sp.due_date
+              FROM scoped_payments sp
+              WHERE sp.status <> 'paid'
+              ORDER BY sp.due_date ASC
+              LIMIT 1
+            ) AS "nextDueDate",
+            (
+              SELECT sp.amount
+              FROM scoped_payments sp
+              WHERE sp.status <> 'paid'
+              ORDER BY sp.due_date ASC
+              LIMIT 1
+            ) AS "nextAmount"
+        `,
+        [userId, apartmentId],
+      );
+
+      tenantPayment = {
+        status: tenantPaymentRes.rows[0]?.status || "unknown",
+        nextDueDate: tenantPaymentRes.rows[0]?.nextDueDate || null,
+        nextAmount:
+          tenantPaymentRes.rows[0]?.nextAmount != null
+            ? Number(tenantPaymentRes.rows[0].nextAmount)
+            : null,
+      };
+    }
+
     const activityRes = await query(
       `
         SELECT id, message, level, occurred_at
@@ -237,7 +290,13 @@ export async function GET() {
       },
     ];
 
-    return NextResponse.json({ metrics, alerts, activity, portfolio });
+    return NextResponse.json({
+      metrics,
+      alerts,
+      activity,
+      portfolio,
+      tenantPayment,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to load dashboard data", detail: error.message },
