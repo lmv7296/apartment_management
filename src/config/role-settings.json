@@ -34,9 +34,9 @@
     "tenant": {
       "quickActions": [
         {
-          "id": "pay-rent",
-          "label": "Pay Rent",
-          "href": "/payments/new",
+          "id": "notify-payment",
+          "label": "Notify Payment",
+          "href": "/payments/notify",
           "className": "hover:brightness-110",
           "style": {
             "background": "linear-gradient(90deg, var(--success), var(--accent))"

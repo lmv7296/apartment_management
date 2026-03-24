@@ -4,7 +4,6 @@ import React from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import KpiRow from "@/app/components/dashboard/KpiRow";
-import AlertsPanel from "@/app/components/dashboard/AlertsPanel";
 import QuickActions from "@/app/components/dashboard/QuickActions";
 import BuildingsUnitsPanel from "@/app/components/dashboard/BuildingsUnitsPanel";
 import roleSettings from "@/config/role-settings.json";
@@ -109,9 +108,10 @@ export default function TenantDashboard() {
   const assignedBuilding = firstAssignment?.building || null;
   const assignedUnit = firstAssignment?.unit || null;
   const paymentSummary = dashboardData.tenantPayment || {};
-  const paymentStatus = String(paymentSummary.status || "unknown").toLowerCase();
-  const paymentStatusLabel =
-    paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1);
+  const paymentStatus = paymentSummary.status ? String(paymentSummary.status).toLowerCase() : null;
+  const paymentStatusLabel = paymentStatus
+    ? paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)
+    : "No lease assigned";
   const nextPaymentAmountLabel =
     paymentSummary.nextAmount != null
       ? new Intl.NumberFormat("en-US", {
@@ -136,44 +136,6 @@ export default function TenantDashboard() {
       ? [{ ...assignedBuilding, units: [assignedUnit] }]
       : [];
 
-  const tenantAlerts = [];
-
-  if (!assignedUnit) {
-    tenantAlerts.push({
-      id: "unit-assignment",
-      title: "No unit assigned",
-      detail: "Your account is not linked to a unit yet.",
-      severity: "medium",
-    });
-  } else {
-    if (assignedUnit.leaseStatus !== "active") {
-      tenantAlerts.push({
-        id: "lease-status",
-        title: "Lease needs attention",
-        detail: `Current lease status is ${assignedUnit.leaseStatus || "unknown"}.`,
-        severity: "high",
-      });
-    }
-
-    if (!assignedUnit.occupied) {
-      tenantAlerts.push({
-        id: "occupancy",
-        title: "Unit marked vacant",
-        detail: "Your assigned unit is currently marked as vacant in records.",
-        severity: "medium",
-      });
-    }
-  }
-
-  if (paymentStatus === "overdue") {
-    tenantAlerts.push({
-      id: "payment-overdue",
-      title: "Payment overdue",
-      detail: "You have at least one overdue payment on your unit.",
-      severity: "high",
-    });
-  }
-
   const tenantKpiItems = [
     {
       id: "my-unit",
@@ -185,26 +147,38 @@ export default function TenantDashboard() {
     {
       id: "lease-status",
       label: "Lease Status",
-      value: assignedUnit?.leaseStatus || "Unknown",
-      subValue: assignedUnit?.leaseStatus ? "Current lease snapshot" : "No lease linked",
-      subTone: assignedUnit?.leaseStatus === "active" ? "low" : "medium",
+      value: assignedUnit?.leaseStatus
+        ? assignedUnit.leaseStatus.charAt(0).toUpperCase() + assignedUnit.leaseStatus.slice(1)
+        : assignedUnit
+          ? "Assigned"
+          : "Unknown",
+      subValue: assignedUnit?.leaseStatus
+        ? "Current lease snapshot"
+        : assignedUnit
+          ? "Unit assigned directly"
+          : "No unit linked",
+      subTone: assignedUnit?.leaseStatus === "active" ? "low" : assignedUnit ? "low" : "medium",
     },
     {
       id: "payment-status",
       label: "Payment Status",
       value: paymentStatusLabel,
       subValue:
-        paymentStatus === "overdue"
-          ? "Action required"
-          : paymentStatus === "paid"
-            ? "Up to date"
-            : "Check current invoice",
+        paymentStatus === null
+          ? "Waiting for assignment"
+          : paymentStatus === "overdue"
+            ? "Action required"
+            : paymentStatus === "paid"
+              ? "Up to date"
+              : "Check current invoice",
       subTone:
-        paymentStatus === "overdue"
-          ? "high"
-          : paymentStatus === "paid"
-            ? "low"
-            : "medium",
+        paymentStatus === null
+          ? "low"
+          : paymentStatus === "overdue"
+            ? "high"
+            : paymentStatus === "paid"
+              ? "low"
+              : "medium",
     },
     {
       id: "next-payment",
@@ -261,36 +235,9 @@ export default function TenantDashboard() {
           </section>
         ) : null}
 
-        <section className='grid grid-cols-1 gap-6 lg:grid-cols-3'>
-          <article
-            className='rounded-xl border p-5'
-            style={{
-              borderColor: "var(--border)",
-              backgroundColor: "var(--surface)",
-              boxShadow: "var(--shadow)",
-            }}>
-            <h2 className='mb-3 text-lg font-semibold [color:var(--text)]'>
-              {tenantSettings.overviewTitle || "Tenant Overview"}
-            </h2>
-            <p className='text-sm app-text-muted'>
-              {tenantSettings.overviewDescription ||
-                "Track only your assigned unit, lease, and related notices in one place."}
-            </p>
-            <div className='mt-4 rounded-lg border p-3 text-xs app-text-muted' style={{ borderColor: "var(--border)", backgroundColor: "var(--surface-2)" }}>
-              {assignedBuilding
-                ? `Assigned to ${assignedBuilding.name}${assignedUnit ? `, Unit ${assignedUnit.code}` : ""}.`
-                : "No unit assignment found yet."}
-            </div>
-          </article>
-
-          <div className='lg:col-span-2'>
-            <BuildingsUnitsPanel items={unitOnlyPortfolio} isManager={false} />
-          </div>
-        </section>
-
-        <AlertsPanel alerts={tenantAlerts} />
-
         <QuickActions actions={tenantSettings.quickActions || []} />
+
+        <BuildingsUnitsPanel items={unitOnlyPortfolio} isManager={false} />
       </div>
     </main>
   );

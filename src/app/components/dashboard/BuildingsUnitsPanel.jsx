@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 function occupancyPillStyle(isOccupied) {
   return isOccupied
     ? {
@@ -94,6 +96,31 @@ export default function BuildingsUnitsPanel({ items, isManager }) {
                           {unit.occupied ? "occupied" : "vacant"}
                         </span>
                       </div>
+
+                      {!isManager ? (
+                        <div className='mt-2 flex w-full gap-2'>
+                          <Link
+                            href={`/Maintenance?unit=${unit.id}`}
+                            className='flex-1 rounded-lg border px-3 py-1.5 text-center text-xs font-semibold transition-opacity hover:opacity-80'
+                            style={{
+                              borderColor: "var(--primary)",
+                              color: "var(--primary)",
+                              backgroundColor: "var(--surface)",
+                            }}>
+                            Request Maintenance
+                          </Link>
+                          <Link
+                            href={`/Maintenance/history?unit=${unit.id}`}
+                            className='flex-1 rounded-lg border px-3 py-1.5 text-center text-xs font-semibold transition-opacity hover:opacity-80'
+                            style={{
+                              borderColor: "var(--border)",
+                              color: "var(--text)",
+                              backgroundColor: "var(--surface-2)",
+                            }}>
+                            See Requests
+                          </Link>
+                        </div>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

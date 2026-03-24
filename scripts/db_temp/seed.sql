@@ -9,12 +9,12 @@ TRUNCATE TABLE
   users
 RESTART IDENTITY CASCADE;
 
-INSERT INTO users (id, name, email, phone, apartment_id, role, created_at, active, password_hash)
+INSERT INTO users (id, name, email, phone, unit_id, role, created_at, active, password_hash)
 VALUES
-  ('11111111-1111-1111-1111-111111111111', 'John Doe', 'john.doe@example.com', '+1-555-0101', 'apt-101', 'tenant', '2023-01-15T10:00:00Z', TRUE, NULL),
-  ('22222222-2222-2222-2222-222222222222', 'Jane Smith', 'jane.smith@example.com', '+1-555-0102', 'apt-102', 'tenant', '2023-02-20T14:30:00Z', TRUE, NULL),
+  ('11111111-1111-1111-1111-111111111111', 'John Doe', 'john.doe@example.com', '+1-555-0101', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001', 'tenant', '2023-01-15T10:00:00Z', TRUE, NULL),
+  ('22222222-2222-2222-2222-222222222222', 'Jane Smith', 'jane.smith@example.com', '+1-555-0102', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb002', 'tenant', '2023-02-20T14:30:00Z', TRUE, NULL),
   ('33333333-3333-3333-3333-333333333333', 'Lorenzo Vredeveld', 'lvredeveld9@gmail.com', '+1-555-0103', NULL, 'manager', '2023-01-01T08:00:00Z', TRUE, NULL),
-  ('44444444-4444-4444-4444-444444444444', 'Sarah Williams', 'sarah.williams@example.com', '+1-555-0104', 'apt-101', 'tenant', '2023-03-10T11:45:00Z', FALSE, NULL);
+  ('44444444-4444-4444-4444-444444444444', 'Sarah Williams', 'sarah.williams@example.com', '+1-555-0104', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001', 'tenant', '2023-03-10T11:45:00Z', FALSE, NULL);
 
 INSERT INTO listings (id, name, address, price, type, image, bedrooms, bathrooms, square_feet, features)
 VALUES
@@ -29,20 +29,20 @@ VALUES
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2', 'Lakeside Commons', '205 Lake St', 'Springfield', 'IL', 10),
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3', 'Oakpoint Towers', '77 Oakpoint Rd', 'Springfield', 'IL', 13);
 
-INSERT INTO units (id, property_id, unit_code, bedrooms, bathrooms, square_feet, occupied)
+INSERT INTO units (id, property_id, unit_code, bedrooms, bathrooms, square_feet)
 VALUES
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 'A-101', 2, 1, 820, TRUE),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb002', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 'A-102', 2, 1, 815, TRUE),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb003', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 'A-103', 1, 1, 640, FALSE),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb004', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 'A-104', 1, 1, 650, TRUE),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb005', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2', 'B-201', 2, 2, 990, TRUE),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb006', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2', 'B-202', 3, 2, 1240, TRUE),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb007', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2', 'B-203', 1, 1, 610, FALSE),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb008', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2', 'B-204', 1, 1, 630, TRUE),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb009', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3', 'C-301', 2, 2, 1080, TRUE),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb010', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3', 'C-302', 2, 2, 1075, TRUE),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb011', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3', 'C-303', 1, 1, 600, TRUE),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb012', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3', 'C-304', 1, 1, 600, FALSE);
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 'A-101', 2, 1, 820),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb002', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 'A-102', 2, 1, 815),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb003', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 'A-103', 1, 1, 640),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb004', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 'A-104', 1, 1, 650),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb005', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2', 'B-201', 2, 2, 990),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb006', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2', 'B-202', 3, 2, 1240),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb007', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2', 'B-203', 1, 1, 610),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb008', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2', 'B-204', 1, 1, 630),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb009', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3', 'C-301', 2, 2, 1080),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb010', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3', 'C-302', 2, 2, 1075),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb011', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3', 'C-303', 1, 1, 600),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb012', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3', 'C-304', 1, 1, 600);
 
 INSERT INTO leases (unit_id, user_id, start_date, end_date, status, monthly_rent)
 VALUES

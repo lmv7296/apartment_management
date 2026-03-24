@@ -266,7 +266,7 @@ export default function ManagerDashboard() {
         {isManager ? (
           <>
             <section className='grid grid-cols-1 gap-6 lg:grid-cols-3'>
-              <AlertsPanel alerts={data.alerts} />
+              <AlertsPanel />
               <div className='lg:col-span-2'>
                 <RecentActivityFeed items={data.activity} />
               </div>

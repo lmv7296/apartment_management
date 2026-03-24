@@ -28,7 +28,7 @@ export const authOptions = {
 
         const { rows } = await query(
           `
-            SELECT id, name, email, role, apartment_id, password_hash
+            SELECT id, name, email, role, unit_id, password_hash
             FROM users
             WHERE LOWER(email) = LOWER($1)
               AND active = TRUE
@@ -65,7 +65,7 @@ export const authOptions = {
           name: user.name,
           email: user.email,
           role: user.role,
-          apartmentId: user.apartment_id,
+          unitId: user.unit_id,
         };
       },
     }),
@@ -75,7 +75,7 @@ export const authOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
-        token.apartmentId = user.apartmentId;
+        token.unitId = user.unitId;
       }
       return token;
     },
@@ -83,7 +83,7 @@ export const authOptions = {
       if (session.user) {
         session.user.id = token.id;
         session.user.role = token.role;
-        session.user.apartmentId = token.apartmentId;
+        session.user.unitId = token.unitId;
       }
       return session;
     },

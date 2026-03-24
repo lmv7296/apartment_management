@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   phone VARCHAR(30),
-  apartment_id VARCHAR(100),
+  unit_id UUID REFERENCES units(id) ON DELETE SET NULL,
   role VARCHAR(50) NOT NULL DEFAULT 'tenant',
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -29,7 +29,6 @@ CREATE TABLE IF NOT EXISTS units (
   bedrooms INTEGER NOT NULL DEFAULT 0,
   bathrooms INTEGER NOT NULL DEFAULT 1,
   square_feet INTEGER,
-  occupied BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (property_id, unit_code)
 );

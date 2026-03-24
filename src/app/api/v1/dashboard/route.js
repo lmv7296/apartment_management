@@ -33,7 +33,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id || null;
-    const apartmentId = session?.user?.apartmentId || null;
+    const unitId = session?.user?.unitId || null;
     const role = String(session?.user?.role || "tenant").toLowerCase();
 
     if (!userId) {
@@ -50,8 +50,16 @@ export async function GET() {
         `
             SELECT
               (SELECT COUNT(*)::int FROM properties) AS "totalProperties",
-              (SELECT COUNT(*)::int FROM units WHERE occupied = TRUE) AS "occupiedUnits",
-              (SELECT COUNT(*)::int FROM units WHERE occupied = FALSE) AS "vacantUnits"
+              (SELECT COUNT(*)::int FROM units u
+               WHERE EXISTS (
+                 SELECT 1 FROM leases l
+                 WHERE l.unit_id = u.id AND l.status = 'active'
+               )) AS "occupiedUnits",
+              (SELECT COUNT(*)::int FROM units u
+               WHERE NOT EXISTS (
+                 SELECT 1 FROM leases l
+                 WHERE l.unit_id = u.id AND l.status = 'active'
+               )) AS "vacantUnits"
           `,
       ),
       query(
@@ -105,7 +113,6 @@ export async function GET() {
             SELECT p.amount, p.due_date, p.status
             FROM payments p
             WHERE p.user_id = $1
-               OR ($2::text IS NOT NULL AND p.unit_id::text = $2)
           )
           SELECT
             (
@@ -136,11 +143,11 @@ export async function GET() {
               LIMIT 1
             ) AS "nextAmount"
         `,
-        [userId, apartmentId],
+        [userId],
       );
 
       tenantPayment = {
-        status: tenantPaymentRes.rows[0]?.status || "unknown",
+        status: tenantPaymentRes.rows[0]?.status || null,
         nextDueDate: tenantPaymentRes.rows[0]?.nextDueDate || null,
         nextAmount:
           tenantPaymentRes.rows[0]?.nextAmount != null
@@ -177,7 +184,7 @@ export async function GET() {
                 p.state,
                 u.id AS "unitId",
                 u.unit_code AS "unitCode",
-                COALESCE(u.occupied, FALSE) AS occupied,
+                CASE WHEN l.user_id IS NOT NULL THEN TRUE ELSE FALSE END AS occupied,
                 l.status AS "leaseStatus",
                 tenant.name AS "tenantName"
               FROM properties p
@@ -206,7 +213,7 @@ export async function GET() {
                 p.state,
                 u.id AS "unitId",
                 u.unit_code AS "unitCode",
-                COALESCE(u.occupied, FALSE) AS occupied,
+                TRUE AS occupied,
                 l.status AS "leaseStatus",
                 tenant.name AS "tenantName"
               FROM units u
@@ -221,18 +228,15 @@ export async function GET() {
                 LIMIT 1
               ) l ON TRUE
               LEFT JOIN users tenant ON tenant.id = l.user_id
-              WHERE
-                ($1::text IS NOT NULL AND u.id::text = $1)
-                OR EXISTS (
-                  SELECT 1
-                  FROM leases ul
-                  WHERE ul.unit_id = u.id
-                    AND ul.user_id = $2
-                    AND ul.status = 'active'
+              WHERE u.id = (
+                SELECT COALESCE(
+                  (SELECT unit_id FROM users WHERE id = $1 AND unit_id IS NOT NULL),
+                  (SELECT unit_id FROM leases WHERE user_id = $1 AND status = 'active' LIMIT 1)
                 )
+              )
               ORDER BY p.name ASC, u.unit_code ASC
             `,
-            values: [apartmentId, userId],
+            values: [userId],
           };
 
     const portfolioRes = await query(
