@@ -1,12 +1,13 @@
 "use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function NotifyPaymentPage() {
   const [receiptFile, setReceiptFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const [tenants, setTenants] = useState([]);
+  const [selectedTenant, setSelectedTenant] = useState(null);
 
   function handleReceiptChange(event) {
     const file = event.target.files?.[0] || null;
@@ -41,6 +42,34 @@ export default function NotifyPaymentPage() {
     }
   }
 
+  function handleNameChange(e) {
+    const name = e.target.value;
+    const tenant = tenants.find((t) => t.name === name) ?? null;
+    setSelectedTenant(tenant);
+  }
+
+  function handleApartmentChange(e) {
+    const apartmentId = e.target.value;
+    const tenant =
+      tenants.find((t) => String(t.apartment_id) === apartmentId) ?? null;
+    setSelectedTenant(tenant);
+  }
+
+  useEffect(() => {
+    async function fetchTenants() {
+      try {
+        const response = await fetch(
+          "/api/v1/Tenants?fields=name,apartment_id,id",
+        );
+        if (!response.ok) throw new Error("Failed to fetch tenant data.");
+        const data = await response.json();
+        setTenants(data);
+      } catch (error) {
+        console.error("Error fetching tenants:", error);
+      }
+    }
+    fetchTenants();
+  }, []);
   return (
     <main className='mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8'>
       <section
@@ -52,30 +81,20 @@ export default function NotifyPaymentPage() {
         }}>
         <div className='flex flex-wrap items-center justify-between gap-3'>
           <div>
-            <p
-              className='inline-flex rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider'
-              style={{
-                borderColor: "var(--border)",
-                color: "var(--accent-2)",
-                backgroundColor: "var(--surface-2)",
-              }}>
-              Payment Notify
-            </p>
+            <Link
+              href='/Payments'
+              className='rounded-full border px-4 py-2 text-sm font-semibold'
+              style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+              Back To Payments
+            </Link>
             <h1 className='mt-4 text-3xl font-black sm:text-4xl'>
-              Notify Tenant Of Payment
+              Payment Received
             </h1>
             <p className='mt-2 max-w-2xl app-text-muted'>
-              Send a payment update with an attached receipt so tenants can keep
-              a full record.
+              Send an update that a payment has been received, along with an
+              attached receipt for record-keeping.
             </p>
           </div>
-
-          <Link
-            href='/Payments'
-            className='rounded-full border px-4 py-2 text-sm font-semibold'
-            style={{ borderColor: "var(--border)", color: "var(--text)" }}>
-            Back To Payments
-          </Link>
         </div>
 
         <form
@@ -84,34 +103,50 @@ export default function NotifyPaymentPage() {
           encType='multipart/form-data'>
           <label className='flex flex-col gap-1.5'>
             <span className='text-sm font-semibold'>Tenant Name</span>
-            <input
+            <select
               required
               name='tenantName'
-              type='text'
-              placeholder='Jane Smith'
+              value={selectedTenant?.name ?? ""}
+              onChange={handleNameChange}
               className='rounded-xl border px-3 py-2 outline-none'
               style={{
                 borderColor: "var(--border)",
                 backgroundColor: "var(--surface-2)",
                 color: "var(--text)",
-              }}
-            />
+              }}>
+              <option value='' disabled>
+                Select a tenant…
+              </option>
+              {tenants.map((t) => (
+                <option key={t.apartment_id} value={t.name}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className='flex flex-col gap-1.5'>
             <span className='text-sm font-semibold'>Apartment / Unit</span>
-            <input
+            <select
               required
               name='unit'
-              type='text'
-              placeholder='Building A - Unit 204'
+              value={selectedTenant?.apartment_id ?? ""}
+              onChange={handleApartmentChange}
               className='rounded-xl border px-3 py-2 outline-none'
               style={{
                 borderColor: "var(--border)",
                 backgroundColor: "var(--surface-2)",
                 color: "var(--text)",
-              }}
-            />
+              }}>
+              <option value='' disabled>
+                Select a unit…
+              </option>
+              {tenants.map((t) => (
+                <option key={t.apartment_id} value={String(t.apartment_id)}>
+                  Unit {t.apartment_id}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className='flex flex-col gap-1.5'>
@@ -166,7 +201,9 @@ export default function NotifyPaymentPage() {
               Accepted formats: PDF, PNG, JPG, JPEG, WEBP.
             </span>
             {receiptFile ? (
-              <span className='text-xs font-semibold' style={{ color: "var(--success)" }}>
+              <span
+                className='text-xs font-semibold'
+                style={{ color: "var(--success)" }}>
                 Selected receipt: {receiptFile.name}
               </span>
             ) : null}
@@ -200,9 +237,7 @@ export default function NotifyPaymentPage() {
             </button>
 
             {message ? (
-              <p className='text-sm app-text-muted'>
-                {message}
-              </p>
+              <p className='text-sm app-text-muted'>{message}</p>
             ) : null}
           </div>
         </form>

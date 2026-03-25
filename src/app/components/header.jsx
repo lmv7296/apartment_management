@@ -7,81 +7,81 @@ import LogoMark from "./logo-mark";
 
 function MobileNav({ isOpen, onClose, session, onSignOut }) {
   return isOpen ? (
-		<div
-			className='border-t px-4 pb-4 pt-3 md:hidden'
-			style={{
-				borderColor: "var(--border)",
-				backgroundColor: "var(--surface)",
-			}}>
-			<div
-				className='mb-4 flex items-center gap-3 rounded-xl border p-3'
-				style={{
-					borderColor: "var(--border)",
-					backgroundColor: "var(--surface-2)",
-				}}>
-				<div
-					className='flex h-10 w-10 items-center justify-center rounded-lg'
-					style={{
-						backgroundColor: "var(--primary)",
-						color: "white",
-					}}>
-					<svg
-						className='h-6 w-6'
-						fill='none'
-						stroke='currentColor'
-						viewBox='0 0 24 24'>
-						<path
-							strokeLinecap='round'
-							strokeLinejoin='round'
-							strokeWidth={2}
-							d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
-						/>
-					</svg>
-				</div>
-				<div className='flex-1'>
-					<p className='text-xs uppercase tracking-wide app-text-muted'>
-						Signed in as
-					</p>
-					<p className='text-sm font-semibold'>{session?.user?.name}</p>
-				</div>
-			</div>
-			<div className='flex flex-col gap-2'>
-				<Link
-					href='/Dashboard'
-					onClick={onClose}
-					className='rounded-lg px-3 py-2 text-sm font-semibold'
-					style={{
-						color: "var(--text)",
-						backgroundColor: "var(--surface-2)",
-					}}>
-					Dashboard
-				</Link>
-				<Link
-					href='/Settings'
-					onClick={onClose}
-					className='rounded-lg px-3 py-2 text-sm font-semibold'
-					style={{
-						color: "var(--text)",
-						backgroundColor: "var(--surface-2)",
-					}}>
-					Settings
-				</Link>
-				<button
-					type='button'
-					onClick={() => {
-						onClose();
-						onSignOut();
-					}}
-					className='rounded-lg px-3 py-2 text-left text-sm font-semibold'
-					style={{
-						color: "var(--danger)",
-						backgroundColor: "var(--surface-2)",
-					}}>
-					Sign out
-				</button>
-			</div>
-		</div>
-	) : null;
+    <div
+      className='border-t px-4 pb-4 pt-3 md:hidden'
+      style={{
+        borderColor: "var(--border)",
+        backgroundColor: "var(--surface)",
+      }}>
+      <div
+        className='mb-4 flex items-center gap-3 rounded-xl border p-3'
+        style={{
+          borderColor: "var(--border)",
+          backgroundColor: "var(--surface-2)",
+        }}>
+        <div
+          className='flex h-10 w-10 items-center justify-center rounded-lg'
+          style={{
+            backgroundColor: "var(--primary)",
+            color: "white",
+          }}>
+          <svg
+            className='h-6 w-6'
+            fill='none'
+            stroke='currentColor'
+            viewBox='0 0 24 24'>
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              strokeWidth={2}
+              d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
+            />
+          </svg>
+        </div>
+        <div className='flex-1'>
+          <p className='text-xs uppercase tracking-wide app-text-muted'>
+            Signed in as
+          </p>
+          <p className='text-sm font-semibold'>{session?.user?.name}</p>
+        </div>
+      </div>
+      <div className='flex flex-col gap-2'>
+        <Link
+          href='/Dashboard'
+          onClick={onClose}
+          className='rounded-lg px-3 py-2 text-sm font-semibold'
+          style={{
+            color: "var(--text)",
+            backgroundColor: "var(--surface-2)",
+          }}>
+          Dashboard
+        </Link>
+        <Link
+          href='/Settings'
+          onClick={onClose}
+          className='rounded-lg px-3 py-2 text-sm font-semibold'
+          style={{
+            color: "var(--text)",
+            backgroundColor: "var(--surface-2)",
+          }}>
+          Settings
+        </Link>
+        <button
+          type='button'
+          onClick={() => {
+            onClose();
+            onSignOut();
+          }}
+          className='rounded-lg px-3 py-2 text-left text-sm font-semibold'
+          style={{
+            color: "var(--danger)",
+            backgroundColor: "var(--surface-2)",
+          }}>
+          Sign out
+        </button>
+      </div>
+    </div>
+  ) : null;
 }
 
 function AuthenticatedActions({ isMobileMenuOpen, onToggleMobileMenu }) {
@@ -169,7 +169,9 @@ export default function Header() {
           {isAuthenticated ? (
             <AuthenticatedActions
               isMobileMenuOpen={isMobileMenuOpen}
-              onToggleMobileMenu={() => setIsMobileMenuOpen((current) => !current)}
+              onToggleMobileMenu={() =>
+                setIsMobileMenuOpen((current) => !current)
+              }
             />
           ) : (
             <UnauthenticatedActions onClose={closeMobileMenu} />
@@ -274,7 +276,9 @@ export default function Header() {
                       <p className='text-xs uppercase tracking-wide app-text-muted'>
                         Signed in as
                       </p>
-                      <p className='text-sm font-semibold'>{session?.user?.name}</p>
+                      <p className='text-sm font-semibold'>
+                        {session?.user?.name}
+                      </p>
                     </div>
                   </div>
                   <Link
