@@ -45,47 +45,47 @@ export default function ManagerDashboard() {
 
     loadDashboard();
 
-        let cancelled = false;
+    let cancelled = false;
 
-        async function loadDashboard() {
-            setIsLoadingData(true);
-            setLoadError("");
+    async function loadDashboard() {
+      setIsLoadingData(true);
+      setLoadError("");
 
-            try {
-                const response = await fetch("/api/v1/dashboard", {
-                    cache: "no-store",
-                });
+      try {
+        const response = await fetch("/api/v1/dashboard", {
+          cache: "no-store",
+        });
 
-                if (!response.ok) {
-                    throw new Error("Could not load dashboard data.");
-                }
-
-                const payload = await response.json();
-
-                if (!cancelled) {
-                    setData({
-                        metrics: payload.metrics || EMPTY_METRICS,
-                        alerts: Array.isArray(payload.alerts) ? payload.alerts : [],
-                        activity: Array.isArray(payload.activity) ? payload.activity : [],
-                        portfolio: Array.isArray(payload.portfolio)
-                            ? payload.portfolio
-                            : [],
-                    });
-                }
-            } catch (error) {
-                if (!cancelled) {
-                    setLoadError(error.message || "Could not load dashboard data.");
-                }
-            } finally {
-                if (!cancelled) {
-                    setIsLoadingData(false);
-                }
-            }
+        if (!response.ok) {
+          throw new Error("Could not load dashboard data.");
         }
-        return () => {
-            cancelled = true;
-        };
-    }, [status, router]);
+
+        const payload = await response.json();
+
+        if (!cancelled) {
+          setData({
+            metrics: payload.metrics || EMPTY_METRICS,
+            alerts: Array.isArray(payload.alerts) ? payload.alerts : [],
+            activity: Array.isArray(payload.activity) ? payload.activity : [],
+            portfolio: Array.isArray(payload.portfolio)
+              ? payload.portfolio
+              : [],
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(error.message || "Could not load dashboard data.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingData(false);
+        }
+      }
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [status, router]);
 
   React.useEffect(() => {
     if (status !== "authenticated") {
@@ -132,6 +132,7 @@ export default function ManagerDashboard() {
       id: "properties",
       label: "Total Properties",
       value: data.metrics.totalProperties,
+      Link: "/Properties",
     },
     {
       id: "occupied",
@@ -139,16 +140,19 @@ export default function ManagerDashboard() {
       value: data.metrics.occupiedUnits,
       subValue: `${occupancyRate}% occupancy`,
       subTone: "low",
+      Link: "/Units?filter=occupied",
     },
     {
       id: "vacant",
       label: "Vacant Units",
       value: data.metrics.vacantUnits,
+      Link: "/Units?filter=vacant",
     },
     {
       id: "collected",
       label: "Rent Collected (Current Month)",
       value: formatMoney(data.metrics.rentCollectedMonth, currency),
+      Link: "/Payments?filter=current_month",
     },
     {
       id: "overdue",
@@ -157,6 +161,7 @@ export default function ManagerDashboard() {
       subValue: "Needs follow-up",
       subTone: "high",
       valueClassName: "[color:var(--danger)]",
+      Link: "/Payments/overdue",
     },
   ];
 
@@ -167,36 +172,6 @@ export default function ManagerDashboard() {
     dashboardRoleSettings[role] ||
     dashboardRoleSettings.tenant ||
     dashboardRoleSettings.manager;
-
-  const tenantKpiItems = [
-    {
-      id: "role",
-      label: "Current Role",
-      value: role,
-    },
-    {
-      id: "alerts",
-      label: "My Alerts",
-      value: data.alerts.length,
-      subValue: "Items needing attention",
-      subTone: data.alerts.length > 0 ? "medium" : "low",
-    },
-    {
-      id: "activity",
-      label: "Recent Updates",
-      value: data.activity.length,
-    },
-    {
-      id: "payments",
-      label: "Overdue Notices",
-      value: data.metrics.overduePayments,
-      subValue:
-        data.metrics.overduePayments > 0 ? "Action required" : "All clear",
-      subTone: data.metrics.overduePayments > 0 ? "high" : "low",
-      valueClassName:
-        data.metrics.overduePayments > 0 ? "[color:var(--danger)]" : "",
-    },
-  ];
 
   if (status === "loading") {
     return (
@@ -235,11 +210,7 @@ export default function ManagerDashboard() {
           </p>
         </section>
 
-        {isManager ? (
-          <KpiRow items={kpiItems} />
-        ) : (
-          <KpiRow items={tenantKpiItems} />
-        )}
+        <KpiRow items={kpiItems} />
 
         {isLoadingData ? (
           <section
@@ -263,48 +234,16 @@ export default function ManagerDashboard() {
           </section>
         ) : null}
 
-        {isManager ? (
-          <>
-            <section className='grid grid-cols-1 gap-6 lg:grid-cols-3'>
-              <AlertsPanel />
-              <div className='lg:col-span-2'>
-                <RecentActivityFeed items={data.activity} />
-              </div>
-            </section>
+        <section className='grid grid-cols-1 gap-6 lg:grid-cols-3'>
+          <AlertsPanel />
+          <div className='lg:col-span-2'>
+            <RecentActivityFeed items={data.activity} />
+          </div>
+        </section>
 
-            <BuildingsUnitsPanel items={data.portfolio} isManager />
+        <BuildingsUnitsPanel items={data.portfolio} isManager />
 
-            <QuickActions actions={currentRoleSettings.quickActions || []} />
-          </>
-        ) : (
-          <>
-            <section className='grid grid-cols-1 gap-6 lg:grid-cols-3'>
-              <article
-                className='rounded-xl border p-5'
-                style={{
-                  borderColor: "var(--border)",
-                  backgroundColor: "var(--surface)",
-                  boxShadow: "var(--shadow)",
-                }}>
-                <h2 className='mb-3 text-lg font-semibold [color:var(--text)]'>
-                  {currentRoleSettings.overviewTitle || "Tenant Overview"}
-                </h2>
-                <p className='text-sm app-text-muted'>
-                  {currentRoleSettings.overviewDescription ||
-                    "This is the tenant-specific branch of the page."}
-                </p>
-              </article>
-
-              <div className='lg:col-span-2'>
-                <RecentActivityFeed items={data.activity} />
-              </div>
-            </section>
-
-            <BuildingsUnitsPanel items={data.portfolio} isManager={false} />
-
-            <QuickActions actions={currentRoleSettings.quickActions || []} />
-          </>
-        )}
+        <QuickActions actions={currentRoleSettings.quickActions || []} />
       </div>
     </main>
   );

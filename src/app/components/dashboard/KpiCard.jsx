@@ -4,6 +4,7 @@ export default function KpiCard({
   subValue,
   subTone = "low",
   valueClassName = "",
+  Link = "",
 }) {
   const toneStyle = {
     high: {
@@ -25,24 +26,45 @@ export default function KpiCard({
 
   return (
     <article
-      className='rounded-xl border p-4'
+      className='rounded-xl border p-4 grid'
       style={{
         borderColor: "var(--border)",
         backgroundColor: "var(--surface)",
         boxShadow: "var(--shadow)",
       }}>
-      <p className='text-sm app-text-muted'>{label}</p>
-      <p
-        className={`mt-1 text-2xl font-black [color:var(--text)] ${valueClassName}`}>
-        {value}
-      </p>
-      {subValue ? (
-        <span
-          className='mt-2 inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide'
-          style={toneStyle[subTone] || toneStyle.low}>
-          {subValue}
-        </span>
-      ) : null}
+      {Link ? (
+        <>
+          <a href={Link} className='mt-2 grid  text-sm font-bold text-blue-500'>
+            <p className='text-sm app-text-muted'>{label}</p>
+            <p
+              className={`mt-1 text-2xl font-black [color:var(--text)] ${valueClassName}`}>
+              {value}
+            </p>
+            {subValue ? (
+              <span
+                className='mt-2 inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide'
+                style={toneStyle[subTone] || toneStyle.low}>
+                {subValue}
+              </span>
+            ) : null}
+          </a>
+        </>
+      ) : (
+        <>
+          <p className='text-sm app-text-muted'>{label}</p>
+          <p
+            className={`mt-1 text-2xl font-black [color:var(--text)] ${valueClassName}`}>
+            {value}
+          </p>
+          {subValue ? (
+            <span
+              className='mt-2 inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide'
+              style={toneStyle[subTone] || toneStyle.low}>
+              {subValue}
+            </span>
+          ) : null}
+        </>
+      )}
     </article>
   );
 }

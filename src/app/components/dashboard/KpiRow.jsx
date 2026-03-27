@@ -10,6 +10,7 @@ export default function KpiRow({ items }) {
           value={item.value}
           subValue={item.subValue}
           valueClassName={item.valueClassName}
+          Link={item.Link}
         />
       ))}
     </section>

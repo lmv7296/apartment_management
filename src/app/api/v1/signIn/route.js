@@ -12,7 +12,9 @@ function isValidDemoPassword(inputPassword) {
 
 export async function POST(request) {
   try {
-    const { email, password } = await request.json();
+    const payload = await request.json();
+    const email = String(payload?.email || "").trim();
+    const password = String(payload?.password || "").trim();
 
     if (!email || !password) {
       return NextResponse.json(
