@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import userPreferences from "@/config/user-preferences.json";
+import { APP_ROUTES } from "@/config/routes";
 
 const defaults = userPreferences.defaultSettings;
 
@@ -20,7 +21,7 @@ export default function SettingsPage() {
 
   React.useEffect(() => {
     if (status === "unauthenticated") {
-      router.replace("/Login");
+      router.replace(APP_ROUTES.login);
     }
   }, [status, router]);
 

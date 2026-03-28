@@ -10,6 +10,7 @@ import BuildingsUnitsPanel from "@/app/components/dashboard/BuildingsUnitsPanel"
 import { useRouter } from "next/navigation";
 import roleSettings from "@/config/role-settings.json";
 import { formatMoney } from "@/utils/formatters/formatMoney";
+import { APP_ROUTES } from "@/config/routes";
 
 const EMPTY_METRICS = {
   totalProperties: 0,
@@ -39,7 +40,7 @@ export default function ManagerDashboard() {
     }
 
     if (status === "unauthenticated") {
-      router.replace("/Login");
+      router.replace(APP_ROUTES.login);
       return;
     }
 

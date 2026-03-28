@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
 import { useEffect } from "react";
+import { APP_ROUTES } from "@/config/routes";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/Dashboard");
+      router.replace(APP_ROUTES.dashboard);
     }
   }, [router, status]);
 

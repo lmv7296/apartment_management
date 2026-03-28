@@ -5,6 +5,7 @@ import ManagerDashboard from "./managerDashboard";
 import TenantDashboard from "./tenantDashboard";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { APP_ROUTES } from "@/config/routes";
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -12,7 +13,7 @@ export default function Dashboard() {
 
   React.useEffect(() => {
     if (status === "unauthenticated") {
-      router.replace("/Login");
+      router.replace(APP_ROUTES.login);
     }
   }, [status, router]);
 

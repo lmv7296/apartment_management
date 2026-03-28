@@ -7,6 +7,7 @@ import KpiRow from "@/app/components/dashboard/KpiRow";
 import QuickActions from "@/app/components/dashboard/QuickActions";
 import BuildingsUnitsPanel from "@/app/components/dashboard/BuildingsUnitsPanel";
 import roleSettings from "@/config/role-settings.json";
+import { APP_ROUTES } from "@/config/routes";
 
 export default function TenantDashboard() {
   const { data: session, status } = useSession();
@@ -24,7 +25,7 @@ export default function TenantDashboard() {
     }
 
     if (status === "unauthenticated") {
-      router.replace("/Login");
+      router.replace(APP_ROUTES.login);
       return;
     }
 
@@ -47,7 +48,9 @@ export default function TenantDashboard() {
 
         if (!cancelled) {
           setDashboardData({
-            portfolio: Array.isArray(payload.portfolio) ? payload.portfolio : [],
+            portfolio: Array.isArray(payload.portfolio)
+              ? payload.portfolio
+              : [],
             tenantPayment: payload.tenantPayment || null,
           });
         }
@@ -96,7 +99,9 @@ export default function TenantDashboard() {
   const role = String(session?.user?.role || "tenant").toLowerCase();
   const firstAssignment = (() => {
     for (const building of dashboardData.portfolio) {
-      const firstUnit = Array.isArray(building.units) ? building.units[0] : null;
+      const firstUnit = Array.isArray(building.units)
+        ? building.units[0]
+        : null;
 
       if (firstUnit) {
         return { building, unit: firstUnit };
@@ -108,7 +113,9 @@ export default function TenantDashboard() {
   const assignedBuilding = firstAssignment?.building || null;
   const assignedUnit = firstAssignment?.unit || null;
   const paymentSummary = dashboardData.tenantPayment || {};
-  const paymentStatus = paymentSummary.status ? String(paymentSummary.status).toLowerCase() : null;
+  const paymentStatus = paymentSummary.status
+    ? String(paymentSummary.status).toLowerCase()
+    : null;
   const paymentStatusLabel = paymentStatus
     ? paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)
     : "No lease assigned";
@@ -148,7 +155,8 @@ export default function TenantDashboard() {
       id: "lease-status",
       label: "Lease Status",
       value: assignedUnit?.leaseStatus
-        ? assignedUnit.leaseStatus.charAt(0).toUpperCase() + assignedUnit.leaseStatus.slice(1)
+        ? assignedUnit.leaseStatus.charAt(0).toUpperCase() +
+          assignedUnit.leaseStatus.slice(1)
         : assignedUnit
           ? "Assigned"
           : "Unknown",
@@ -157,7 +165,12 @@ export default function TenantDashboard() {
         : assignedUnit
           ? "Unit assigned directly"
           : "No unit linked",
-      subTone: assignedUnit?.leaseStatus === "active" ? "low" : assignedUnit ? "low" : "medium",
+      subTone:
+        assignedUnit?.leaseStatus === "active"
+          ? "low"
+          : assignedUnit
+            ? "low"
+            : "medium",
     },
     {
       id: "payment-status",
@@ -184,10 +197,9 @@ export default function TenantDashboard() {
       id: "next-payment",
       label: "Next Payment Date",
       value: nextPaymentDateLabel,
-      subValue:
-        nextPaymentAmountLabel
-          ? `Amount due: ${nextPaymentAmountLabel}`
-          : "No unpaid invoice found",
+      subValue: nextPaymentAmountLabel
+        ? `Amount due: ${nextPaymentAmountLabel}`
+        : "No unpaid invoice found",
       subTone: paymentSummary.nextDueDate ? "medium" : "low",
     },
   ];
