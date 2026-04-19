@@ -8,7 +8,6 @@ const queryGetProperties = `
     p.address,
     p.city,
     p.state,
-    p.total_units AS "totalUnits",
     p.created_at AS "createdAt",
     COUNT(DISTINCT u.id)::int AS "unitCount",
     COUNT(DISTINCT l.user_id)::int AS "tenantCount"

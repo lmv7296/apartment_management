@@ -8,7 +8,6 @@ const queryGetPropertyById = `
     p.address,
     p.city,
     p.state,
-    p.total_units AS "totalUnits",
     p.created_at AS "createdAt",
     COUNT(DISTINCT u.id)::int AS "unitCount",
     COUNT(DISTINCT l.user_id)::int AS "tenantCount"
@@ -27,10 +26,11 @@ const queryGetPropertyUnits = `
     u.bathrooms,
     u.square_feet AS "squareFeet",
     l.status AS "leaseStatus",
+    l.leave_date AS "leaveDate",
     tenant.name AS "tenantName"
   FROM units u
   LEFT JOIN LATERAL (
-    SELECT lx.user_id, lx.status
+    SELECT lx.user_id, lx.status, lx.leave_date
     FROM leases lx
     WHERE lx.unit_id = u.id
     ORDER BY
@@ -43,8 +43,9 @@ const queryGetPropertyUnits = `
   ORDER BY u.unit_code ASC
 `;
 
-export async function GET(_request, { params }) {
+export async function GET(_request, { params: paramsPromise }) {
   try {
+    const params = await paramsPromise;
     const propertyId = String(params?.id || "").trim();
 
     if (!propertyId) {

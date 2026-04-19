@@ -28,7 +28,7 @@ export const authOptions = {
 
         const { rows } = await query(
           `
-            SELECT id, name, email, role, unit_id, password_hash
+            SELECT id,company_id, name, email, role, unit_id, password_hash
             FROM users
             WHERE LOWER(email) = LOWER($1)
               AND active = TRUE
@@ -65,29 +65,34 @@ export const authOptions = {
           name: user.name,
           email: user.email,
           role: user.role,
+          company_id: user.company_id,
           unitId: user.unit_id,
         };
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.role = user.role;
-        token.unitId = user.unitId;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id;
-        session.user.role = token.role;
-        session.user.unitId = token.unitId;
-      }
-      return session;
-    },
+callbacks: {
+  async jwt({ token, user }) {
+    // When the user logs in, 'user' contains the data from your DB
+    if (user) {
+      token.id = user.id;
+      token.company_id = user.company_id;
+      token.role = user.role;
+      token.unit_id = user.unit_id;
+    }
+    return token;
   },
+  async session({ session, token }) {
+    // Transfer the data from the token to the session object
+    if (session.user) {
+      session.user.id = token.id;
+      session.user.company_id = token.company_id;
+      session.user.role = token.role;
+      session.user.unit_id = token.unit_id;
+    }
+    return session;
+  }
+},
   pages: {
     signIn: "/Login",
   },

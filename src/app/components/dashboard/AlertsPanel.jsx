@@ -18,10 +18,10 @@ export default function AlertsPanel() {
     },
     {
       id: "view-apartments",
-      label: "View Apartments",
-      href: "/Apartments",
+      label: "View Units",
+      href: "/Units",
       icon: "🏢",
-      description: "View all properties and units",
+      description: "View all units",
     },
     {
       id: "payment-settings",

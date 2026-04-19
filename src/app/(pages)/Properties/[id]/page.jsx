@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { APP_ROUTES } from "@/config/routes";
-import BasicModal from "@/app/components/basic-modal";
+import userPreferences from "@/config/user-preferences.json";
+import AddTenantModal from "@/app/components/modals/AddTenantModal";
+import RemoveTenantModal from "@/app/components/modals/RemoveTenantModal";
+import AddUnitModal from "@/app/components/modals/AddUnitModal";
 
 export default function PropertyDetailsPage() {
   const { status } = useSession();
@@ -18,20 +21,33 @@ export default function PropertyDetailsPage() {
   const [modalMode, setModalMode] = React.useState("");
   const [activeUnit, setActiveUnit] = React.useState(null);
   const [actionMessage, setActionMessage] = React.useState("");
-  const [addTenantForm, setAddTenantForm] = React.useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    startDate: "",
-    monthlyRent: "",
-    notes: "",
-  });
-  const [removeTenantForm, setRemoveTenantForm] = React.useState({
-    leaveDate: "",
-    forwardingAddress: "",
-    reason: "",
-    depositReturnAmount: "",
-    notes: "",
+  const [userCurrency, setUserCurrency] = React.useState(
+    userPreferences.defaultSettings.currency,
+  );
+  const [formData, setFormData] = React.useState({
+    add: {
+      fullName: "",
+      email: "",
+      phone: "",
+      startDate: "",
+      monthlyRent: "",
+      currency: userPreferences.defaultSettings.currency,
+      notes: "",
+    },
+    remove: {
+      leaveDate: "",
+      forwardingAddress: "",
+      reason: "",
+      depositReturnAmount: "",
+      notes: "",
+    },
+    addUnit: {
+      unitCode: "",
+      bedrooms: "",
+      bathrooms: "",
+      squareFeet: "",
+      areaUnit: "sqft",
+    },
   });
 
   function openModal(mode, unit) {
@@ -45,40 +61,136 @@ export default function PropertyDetailsPage() {
     setActiveUnit(null);
   }
 
-  function onChangeAddTenant(event) {
+  function onChangeForm(event) {
     const { name, value } = event.target;
-    setAddTenantForm((previous) => ({
-      ...previous,
-      [name]: value,
+    setFormData((prev) => ({
+      ...prev,
+      [modalMode]: {
+        ...prev[modalMode],
+        [name]: value,
+      },
     }));
   }
 
-  function onChangeRemoveTenant(event) {
-    const { name, value } = event.target;
-    setRemoveTenantForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  }
-
-  function submitAddTenant(event) {
+  async function submitForm(event) {
     event.preventDefault();
 
-    // Placeholder submission for future API wiring.
-    setActionMessage(
-      `Tenant details prepared for ${activeUnit?.unitCode || "unit"}.`,
-    );
-    closeModal();
-  }
+    try {
+      if (modalMode === "add") {
+        // Add tenant
+        setActionMessage(
+          `Tenant details prepared for ${activeUnit?.unitCode || "unit"}.`,
+        );
+        closeModal();
+      } else if (modalMode === "remove") {
+        // Remove tenant
+        const propertyId = String(params?.id || "");
+        const response = await fetch(
+          `/api/v1/Properties/${propertyId}/remove-tenant`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              unitId: activeUnit?.id,
+              leaveDate: formData.remove.leaveDate,
+              forwardingAddress: formData.remove.forwardingAddress,
+              reason: formData.remove.reason,
+              depositReturnAmount: formData.remove.depositReturnAmount,
+              notes: formData.remove.notes,
+            }),
+          },
+        );
 
-  function submitRemoveTenant(event) {
-    event.preventDefault();
+        const data = await response.json();
 
-    // Placeholder submission for future API wiring.
-    setActionMessage(
-      `Move-out details prepared for ${activeUnit?.unitCode || "unit"}.`,
-    );
-    closeModal();
+        if (!response.ok) {
+          throw new Error(data?.error || "Failed to remove tenant");
+        }
+
+        setActionMessage(
+          `Tenant successfully removed from ${activeUnit?.unitCode || "unit"}.`,
+        );
+        setFormData((prev) => ({
+          ...prev,
+          remove: {
+            leaveDate: "",
+            forwardingAddress: "",
+            reason: "",
+            depositReturnAmount: "",
+            notes: "",
+          },
+        }));
+        closeModal();
+        // Reload property data
+        const propertyResponse = await fetch(
+          `/api/v1/Properties/${propertyId}`,
+          {
+            cache: "no-store",
+          },
+        );
+        const propertyData = await propertyResponse.json();
+        setProperty(propertyData);
+      } else if (modalMode === "addUnit") {
+        // Add unit
+        const propertyId = String(params?.id || "");
+        const parsedArea = formData.addUnit.squareFeet
+          ? Number(formData.addUnit.squareFeet)
+          : null;
+        const normalizedSquareFeet =
+          parsedArea == null
+            ? null
+            : formData.addUnit.areaUnit === "sqm"
+              ? Math.round(parsedArea * 10.7639)
+              : Math.round(parsedArea);
+
+        const response = await fetch(`/api/v1/Properties/${propertyId}/units`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            unitCode: formData.addUnit.unitCode,
+            bedrooms: parseInt(formData.addUnit.bedrooms) || 0,
+            bathrooms: parseInt(formData.addUnit.bathrooms) || 1,
+            squareFeet: normalizedSquareFeet,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.error || "Failed to add unit");
+        }
+
+        setActionMessage(
+          `Unit ${formData.addUnit.unitCode} successfully created.`,
+        );
+        setFormData((prev) => ({
+          ...prev,
+          addUnit: {
+            unitCode: "",
+            bedrooms: "",
+            bathrooms: "",
+            squareFeet: "",
+            areaUnit: "sqft",
+          },
+        }));
+        closeModal();
+        // Reload property data
+        const propertyResponse = await fetch(
+          `/api/v1/Properties/${propertyId}`,
+          {
+            cache: "no-store",
+          },
+        );
+        const propertyData = await propertyResponse.json();
+        setProperty(propertyData);
+      }
+    } catch (err) {
+      setActionMessage(`Error: ${err.message}`);
+    }
   }
 
   React.useEffect(() => {
@@ -89,6 +201,28 @@ export default function PropertyDetailsPage() {
 
     if (status !== "authenticated") {
       return;
+    }
+
+    async function loadUserSettings() {
+      try {
+        const response = await fetch("/api/v1/user-settings", {
+          cache: "no-store",
+        });
+        const data = await response.json();
+
+        if (response.ok && data.currency) {
+          setUserCurrency(data.currency);
+          setFormData((prev) => ({
+            ...prev,
+            add: {
+              ...prev.add,
+              currency: data.currency,
+            },
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to load user settings:", err);
+      }
     }
 
     async function loadProperty() {
@@ -117,8 +251,21 @@ export default function PropertyDetailsPage() {
       }
     }
 
+    loadUserSettings();
     loadProperty();
   }, [params, router, status]);
+
+  React.useEffect(() => {
+    if (!actionMessage) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      setActionMessage("");
+    }, 3500);
+
+    return () => clearTimeout(timeoutId);
+  }, [actionMessage]);
 
   return (
     <main className='mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8'>
@@ -177,18 +324,23 @@ export default function PropertyDetailsPage() {
               <span
                 className='rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide'
                 style={{ borderColor: "var(--border)" }}>
-                {property.totalUnits ?? 0} Total Units
-              </span>
-              <span
-                className='rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide'
-                style={{ borderColor: "var(--border)" }}>
-                {property.unitCount ?? 0} Listed Units
+                {property.unitCount ?? 0} Total Units
               </span>
               <span
                 className='rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide'
                 style={{ borderColor: "var(--border)" }}>
                 {property.tenantCount ?? 0} Active Tenants
               </span>
+              <button
+                type='button'
+                onClick={() => openModal("addUnit", null)}
+                className='rounded-full px-4 py-2 text-xs font-bold text-white transition hover:brightness-110'
+                style={{
+                  background:
+                    "linear-gradient(90deg, var(--accent), var(--primary))",
+                }}>
+                Add Unit
+              </button>
             </div>
           </section>
 
@@ -221,18 +373,40 @@ export default function PropertyDetailsPage() {
                     {unit.tenantName || "No tenant"}
                   </span>
                 </p>
+                {unit.leaveDate ? (
+                  <p
+                    className='mt-2 text-sm font-semibold'
+                    style={{ color: "var(--warning, #f59e0b)" }}>
+                    Move-out: {new Date(unit.leaveDate).toLocaleDateString()}
+                  </p>
+                ) : null}
                 <div className='mt-4 flex flex-wrap gap-2'>
                   {unit.tenantName ? (
-                    <button
-                      type='button'
-                      onClick={() => openModal("remove", unit)}
-                      className='rounded-full border px-4 py-2 text-xs font-bold transition hover:bg-red-50'
-                      style={{
-                        borderColor: "var(--danger, #dc2626)",
-                        color: "var(--danger, #dc2626)",
-                      }}>
-                      Remove Tenant
-                    </button>
+                    <>
+                      {unit.leaveDate ? (
+                        <button
+                          type='button'
+                          disabled
+                          className='rounded-full border px-4 py-2 text-xs font-bold cursor-not-allowed opacity-60'
+                          style={{
+                            borderColor: "var(--warning, #f59e0b)",
+                            color: "var(--warning, #f59e0b)",
+                          }}>
+                          Tenant Leaving
+                        </button>
+                      ) : (
+                        <button
+                          type='button'
+                          onClick={() => openModal("remove", unit)}
+                          className='rounded-full border px-4 py-2 text-xs font-bold transition hover:bg-red-50'
+                          style={{
+                            borderColor: "var(--danger, #dc2626)",
+                            color: "var(--danger, #dc2626)",
+                          }}>
+                          Remove Tenant
+                        </button>
+                      )}
+                    </>
                   ) : (
                     <button
                       type='button'
@@ -252,267 +426,52 @@ export default function PropertyDetailsPage() {
 
           {actionMessage ? (
             <div
-              className='mb-4 rounded-2xl border px-4 py-3 text-sm font-semibold'
-              style={{
-                borderColor: "var(--success, #16a34a)",
-                color: "var(--success, #16a34a)",
-                backgroundColor:
-                  "color-mix(in oklab, var(--success, #16a34a) 12%, white)",
-              }}>
+              className='fixed right-4 bottom-4 z-50 max-w-sm rounded-2xl border px-4 py-3 text-sm font-semibold shadow-lg'
+              style={
+                actionMessage.startsWith("Error:")
+                  ? {
+                      borderColor: "var(--danger, #dc2626)",
+                      color: "var(--danger, #dc2626)",
+                      backgroundColor:
+                        "color-mix(in oklab, var(--danger, #dc2626) 10%, white)",
+                    }
+                  : {
+                      borderColor: "var(--success, #16a34a)",
+                      color: "var(--success, #16a34a)",
+                      backgroundColor:
+                        "color-mix(in oklab, var(--success, #16a34a) 12%, white)",
+                    }
+              }>
               {actionMessage}
             </div>
           ) : null}
 
-          <BasicModal
+          <AddTenantModal
             isOpen={modalMode === "add"}
             onClose={closeModal}
-            title={`Add Tenant ${activeUnit?.unitCode ? `- ${activeUnit.unitCode}` : ""}`}
-            description='Capture basic tenant details before creating a lease.'
-            footer={
-              <>
-                <button
-                  type='button'
-                  onClick={closeModal}
-                  className='rounded-full border px-4 py-2 text-sm font-semibold'
-                  style={{
-                    borderColor: "var(--border)",
-                    color: "var(--text)",
-                  }}>
-                  Cancel
-                </button>
-                <button
-                  type='submit'
-                  form='add-tenant-form'
-                  className='rounded-full px-4 py-2 text-sm font-bold text-white'
-                  style={{
-                    background:
-                      "linear-gradient(90deg, var(--accent), var(--primary))",
-                  }}>
-                  Save Tenant
-                </button>
-              </>
-            }>
-            <form
-              id='add-tenant-form'
-              onSubmit={submitAddTenant}
-              className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
-              <label className='flex flex-col gap-1 sm:col-span-2'>
-                <span className='text-xs font-semibold uppercase app-text-muted'>
-                  Full Name
-                </span>
-                <input
-                  required
-                  name='fullName'
-                  value={addTenantForm.fullName}
-                  onChange={onChangeAddTenant}
-                  className='rounded-xl border px-3 py-2 outline-none'
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
-                  }}
-                />
-              </label>
-              <label className='flex flex-col gap-1'>
-                <span className='text-xs font-semibold uppercase app-text-muted'>
-                  Email
-                </span>
-                <input
-                  required
-                  type='email'
-                  name='email'
-                  value={addTenantForm.email}
-                  onChange={onChangeAddTenant}
-                  className='rounded-xl border px-3 py-2 outline-none'
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
-                  }}
-                />
-              </label>
-              <label className='flex flex-col gap-1'>
-                <span className='text-xs font-semibold uppercase app-text-muted'>
-                  Phone
-                </span>
-                <input
-                  required
-                  name='phone'
-                  value={addTenantForm.phone}
-                  onChange={onChangeAddTenant}
-                  className='rounded-xl border px-3 py-2 outline-none'
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
-                  }}
-                />
-              </label>
-              <label className='flex flex-col gap-1'>
-                <span className='text-xs font-semibold uppercase app-text-muted'>
-                  Lease Start
-                </span>
-                <input
-                  required
-                  type='date'
-                  name='startDate'
-                  value={addTenantForm.startDate}
-                  onChange={onChangeAddTenant}
-                  className='rounded-xl border px-3 py-2 outline-none'
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
-                  }}
-                />
-              </label>
-              <label className='flex flex-col gap-1'>
-                <span className='text-xs font-semibold uppercase app-text-muted'>
-                  Monthly Rent
-                </span>
-                <input
-                  required
-                  type='number'
-                  min='0'
-                  step='0.01'
-                  name='monthlyRent'
-                  value={addTenantForm.monthlyRent}
-                  onChange={onChangeAddTenant}
-                  className='rounded-xl border px-3 py-2 outline-none'
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
-                  }}
-                />
-              </label>
-              <label className='flex flex-col gap-1 sm:col-span-2'>
-                <span className='text-xs font-semibold uppercase app-text-muted'>
-                  Notes
-                </span>
-                <textarea
-                  name='notes'
-                  rows={3}
-                  value={addTenantForm.notes}
-                  onChange={onChangeAddTenant}
-                  className='rounded-xl border px-3 py-2 outline-none'
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
-                  }}
-                />
-              </label>
-            </form>
-          </BasicModal>
+            activeUnit={activeUnit}
+            formData={formData.add}
+            onChangeForm={onChangeForm}
+            onSubmit={submitForm}
+            userCurrency={userCurrency}
+          />
 
-          <BasicModal
+          <RemoveTenantModal
             isOpen={modalMode === "remove"}
             onClose={closeModal}
-            title={`Remove Tenant ${activeUnit?.unitCode ? `- ${activeUnit.unitCode}` : ""}`}
-            description='Record move-out details before ending the lease.'
-            footer={
-              <>
-                <button
-                  type='button'
-                  onClick={closeModal}
-                  className='rounded-full border px-4 py-2 text-sm font-semibold'
-                  style={{
-                    borderColor: "var(--border)",
-                    color: "var(--text)",
-                  }}>
-                  Cancel
-                </button>
-                <button
-                  type='submit'
-                  form='remove-tenant-form'
-                  className='rounded-full px-4 py-2 text-sm font-bold text-white'
-                  style={{ backgroundColor: "var(--danger, #dc2626)" }}>
-                  Confirm Removal
-                </button>
-              </>
-            }>
-            <form
-              id='remove-tenant-form'
-              onSubmit={submitRemoveTenant}
-              className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
-              <label className='flex flex-col gap-1'>
-                <span className='text-xs font-semibold uppercase app-text-muted'>
-                  Leave Date
-                </span>
-                <input
-                  required
-                  type='date'
-                  name='leaveDate'
-                  value={removeTenantForm.leaveDate}
-                  onChange={onChangeRemoveTenant}
-                  className='rounded-xl border px-3 py-2 outline-none'
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
-                  }}
-                />
-              </label>
-              <label className='flex flex-col gap-1'>
-                <span className='text-xs font-semibold uppercase app-text-muted'>
-                  Deposit Return
-                </span>
-                <input
-                  type='number'
-                  min='0'
-                  step='0.01'
-                  name='depositReturnAmount'
-                  value={removeTenantForm.depositReturnAmount}
-                  onChange={onChangeRemoveTenant}
-                  className='rounded-xl border px-3 py-2 outline-none'
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
-                  }}
-                />
-              </label>
-              <label className='flex flex-col gap-1 sm:col-span-2'>
-                <span className='text-xs font-semibold uppercase app-text-muted'>
-                  Forwarding Address
-                </span>
-                <input
-                  name='forwardingAddress'
-                  value={removeTenantForm.forwardingAddress}
-                  onChange={onChangeRemoveTenant}
-                  className='rounded-xl border px-3 py-2 outline-none'
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
-                  }}
-                />
-              </label>
-              <label className='flex flex-col gap-1 sm:col-span-2'>
-                <span className='text-xs font-semibold uppercase app-text-muted'>
-                  Reason
-                </span>
-                <input
-                  name='reason'
-                  value={removeTenantForm.reason}
-                  onChange={onChangeRemoveTenant}
-                  className='rounded-xl border px-3 py-2 outline-none'
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
-                  }}
-                />
-              </label>
-              <label className='flex flex-col gap-1 sm:col-span-2'>
-                <span className='text-xs font-semibold uppercase app-text-muted'>
-                  Notes
-                </span>
-                <textarea
-                  name='notes'
-                  rows={3}
-                  value={removeTenantForm.notes}
-                  onChange={onChangeRemoveTenant}
-                  className='rounded-xl border px-3 py-2 outline-none'
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
-                  }}
-                />
-              </label>
-            </form>
-          </BasicModal>
+            activeUnit={activeUnit}
+            formData={formData.remove}
+            onChangeForm={onChangeForm}
+            onSubmit={submitForm}
+          />
+
+          <AddUnitModal
+            isOpen={modalMode === "addUnit"}
+            onClose={closeModal}
+            formData={formData.addUnit}
+            onChangeForm={onChangeForm}
+            onSubmit={submitForm}
+          />
         </>
       ) : null}
     </main>

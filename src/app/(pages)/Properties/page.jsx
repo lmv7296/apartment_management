@@ -175,7 +175,7 @@ export default function PropertiesPage() {
                   <span
                     className='rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide'
                     style={{ borderColor: "var(--border)" }}>
-                    {property.totalUnits ?? property.unitCount ?? 0} Total Units
+                    {property.unitCount ?? property.unitCount ?? 0} Total Units
                   </span>
                   <span
                     className='rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide'
