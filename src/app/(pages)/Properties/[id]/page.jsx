@@ -267,179 +267,515 @@ export default function PropertyDetailsPage() {
     return () => clearTimeout(timeoutId);
   }, [actionMessage]);
 
-  return (
-    <main className='mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8'>
-      <div className='mb-6'>
-        <Link
-          href='/Properties'
-          className='inline-flex rounded-full border px-4 py-2 text-sm font-semibold'
-          style={{ borderColor: "var(--border)", color: "var(--text)" }}>
-          Back to Properties
-        </Link>
-      </div>
+  // ── View state ─────────────────────────────────────────────────────
+  const [unitFilter, setUnitFilter] = React.useState("all");
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [currentPage, setCurrentPage] = React.useState(1);
 
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [unitFilter, searchQuery]);
+
+  // ── Helpers ────────────────────────────────────────────────────────
+  const ITEMS_PER_PAGE = 10;
+
+  function getUnitStatus(unit) {
+    if (!unit.tenantName) return "vacant";
+    if (unit.leaveDate) return "maintenance";
+    return "occupied";
+  }
+
+  const AVATAR_COLORS = ["#1d4ed8", "#7c3aed", "#059669", "#b45309", "#dc2626"];
+  function getAvatarColor(name) {
+    if (!name) return "#94a3b8";
+    let hash = 0;
+    for (let i = 0; i < name.length; i++)
+      hash = (hash << 5) - hash + name.charCodeAt(i);
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+  }
+  function getInitials(name) {
+    if (!name) return "?";
+    const parts = name.trim().split(/\s+/);
+    return parts.length >= 2
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : name.slice(0, 2).toUpperCase();
+  }
+
+  // ── Computed ───────────────────────────────────────────────────────
+  const allUnits = property?.units || [];
+  const occupiedCount = allUnits.filter(
+    (u) => getUnitStatus(u) === "occupied",
+  ).length;
+  const vacantCount = allUnits.filter(
+    (u) => getUnitStatus(u) === "vacant",
+  ).length;
+  const maintenanceCount = allUnits.filter(
+    (u) => getUnitStatus(u) === "maintenance",
+  ).length;
+  const occupancyPct =
+    allUnits.length > 0
+      ? ((occupiedCount / allUnits.length) * 100).toFixed(1)
+      : "—";
+
+  const filteredUnits = allUnits.filter((unit) => {
+    const status = getUnitStatus(unit);
+    const matchesFilter = unitFilter === "all" || unitFilter === status;
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      (unit.unitCode || "").toLowerCase().includes(q) ||
+      (unit.tenantName || "").toLowerCase().includes(q);
+    return matchesFilter && matchesSearch;
+  });
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredUnits.length / ITEMS_PER_PAGE),
+  );
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedUnits = filteredUnits.slice(
+    (safePage - 1) * ITEMS_PER_PAGE,
+    safePage * ITEMS_PER_PAGE,
+  );
+
+  return (
+    <main className='min-h-screen bg-slate-50 px-6 py-6'>
+      {/* ── Loading ──────────────────────────────────────────────── */}
       {loading ? (
-        <div
-          className='rounded-2xl border p-8 text-center'
-          style={{
-            borderColor: "var(--border)",
-            backgroundColor: "var(--surface)",
-          }}>
-          Loading property...
+        <div className='rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500'>
+          Loading property…
         </div>
       ) : null}
 
+      {/* ── Error ────────────────────────────────────────────────── */}
       {!loading && error ? (
-        <div
-          className='rounded-2xl border p-4 text-sm font-semibold'
-          style={{
-            borderColor: "var(--danger, #dc2626)",
-            color: "var(--danger, #dc2626)",
-            backgroundColor:
-              "color-mix(in oklab, var(--danger, #dc2626) 10%, white)",
-          }}>
+        <div className='rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-600'>
           {error}
         </div>
       ) : null}
 
+      {/* ── Main content ─────────────────────────────────────────── */}
       {!loading && !error && property ? (
         <>
-          <section
-            className='mb-6 rounded-3xl border p-6 sm:p-8'
-            style={{
-              borderColor: "var(--border)",
-              background:
-                "linear-gradient(120deg, color-mix(in oklab, var(--primary) 14%, transparent), color-mix(in oklab, var(--accent) 11%, transparent))",
-            }}>
-            <p className='text-xs font-bold tracking-[0.2em] uppercase app-text-muted'>
-              Property Details
-            </p>
-            <h1 className='mt-2 text-3xl font-black sm:text-4xl'>
+          {/* Breadcrumb */}
+          <nav className='mb-4 flex items-center gap-1.5 text-xs font-medium text-slate-400'>
+            <Link
+              href='/Properties'
+              className='transition-colors hover:text-slate-700'>
+              Portfolio
+            </Link>
+            <span>/</span>
+            <span className='font-semibold text-slate-700'>
               {property.name}
-            </h1>
-            <p className='mt-2 app-text-muted'>
-              {property.address}, {property.city}, {property.state}
-            </p>
-            <div className='mt-4 flex flex-wrap gap-2'>
-              <span
-                className='rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide'
-                style={{ borderColor: "var(--border)" }}>
-                {property.unitCount ?? 0} Total Units
-              </span>
-              <span
-                className='rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide'
-                style={{ borderColor: "var(--border)" }}>
-                {property.tenantCount ?? 0} Active Tenants
-              </span>
+            </span>
+          </nav>
+
+          {/* Page header */}
+          <div className='mb-6 flex flex-wrap items-start justify-between gap-4'>
+            <div>
+              <h1 className='text-3xl font-black text-slate-900'>
+                {property.name}
+              </h1>
+              <p className='mt-1 flex items-center gap-1.5 text-sm text-slate-500'>
+                <svg
+                  className='h-4 w-4 shrink-0'
+                  viewBox='0 0 20 20'
+                  fill='currentColor'>
+                  <path
+                    fillRule='evenodd'
+                    d='M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z'
+                    clipRule='evenodd'
+                  />
+                </svg>
+                {property.address}, {property.city}, {property.state}
+              </p>
+            </div>
+            <div className='flex items-center gap-3'>
+              <button
+                type='button'
+                className='flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50'>
+                <svg
+                  className='h-4 w-4'
+                  viewBox='0 0 20 20'
+                  fill='currentColor'>
+                  <path
+                    fillRule='evenodd'
+                    d='M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z'
+                    clipRule='evenodd'
+                  />
+                </svg>
+                Export Data
+              </button>
               <button
                 type='button'
                 onClick={() => openModal("addUnit", null)}
-                className='rounded-full px-4 py-2 text-xs font-bold text-white transition hover:brightness-110'
-                style={{
-                  background:
-                    "linear-gradient(90deg, var(--accent), var(--primary))",
-                }}>
+                className='flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold text-white'
+                style={{ backgroundColor: "#0f172a" }}>
+                <svg
+                  className='h-4 w-4'
+                  viewBox='0 0 20 20'
+                  fill='currentColor'>
+                  <path
+                    fillRule='evenodd'
+                    d='M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z'
+                    clipRule='evenodd'
+                  />
+                </svg>
                 Add Unit
               </button>
             </div>
-          </section>
+          </div>
 
-          <section className='grid grid-cols-1 gap-4 md:grid-cols-2'>
-            {(property.units || []).map((unit) => (
-              <article
-                key={unit.id}
-                className='rounded-2xl border p-4'
-                style={{
-                  borderColor: "var(--border)",
-                  backgroundColor: "var(--surface)",
-                  boxShadow: "var(--shadow)",
-                }}>
-                <h2 className='text-lg font-black'>
-                  {unit.unitCode || "Unit"}
-                </h2>
-                <p className='mt-2 text-sm app-text-muted'>
-                  {unit.bedrooms} bed | {unit.bathrooms} bath |{" "}
-                  {unit.squareFeet || "-"} sqft
+          {/* KPI cards */}
+          <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
+            <div className='rounded-xl border border-slate-200 bg-white p-5'>
+              <p className='text-[11px] font-semibold uppercase tracking-wider text-slate-400'>
+                Occupancy Rate
+              </p>
+              <p className='mt-2 text-2xl font-black text-slate-900'>
+                {occupancyPct}%
+              </p>
+              <p className='mt-1 text-[11px] text-slate-400'>
+                {occupiedCount} of {allUnits.length} units
+              </p>
+            </div>
+
+            <div
+              className='rounded-xl border border-slate-200 bg-white p-5'
+              style={{ borderLeftWidth: 4, borderLeftColor: "#10b981" }}>
+              <p className='text-[11px] font-semibold uppercase tracking-wider text-slate-400'>
+                Annual Revenue
+              </p>
+              <p className='mt-2 text-2xl font-black text-slate-900'>—</p>
+              <p className='mt-1 text-[11px] text-slate-400'>No revenue data</p>
+            </div>
+
+            <div className='rounded-xl border border-slate-200 bg-white p-5'>
+              <p className='text-[11px] font-semibold uppercase tracking-wider text-slate-400'>
+                Total Units
+              </p>
+              <p className='mt-2 text-2xl font-black text-slate-900'>
+                {allUnits.length}
+              </p>
+              <p className='mt-1 text-[11px] text-slate-400'>
+                {vacantCount} vacant
+              </p>
+            </div>
+
+            <div className='rounded-xl border border-slate-200 bg-white p-5'>
+              <p className='text-[11px] font-semibold uppercase tracking-wider text-slate-400'>
+                Avg. Lease Term
+              </p>
+              <p className='mt-2 text-2xl font-black text-slate-900'>—</p>
+              <p className='mt-1 text-[11px] text-slate-400'>No lease data</p>
+            </div>
+          </div>
+
+          {/* Units panel */}
+          <div className='rounded-xl border border-slate-200 bg-white'>
+            {/* Search + filter bar */}
+            <div className='flex flex-wrap items-center gap-3 border-b border-slate-100 px-4 py-3'>
+              <div className='relative min-w-[200px] flex-1'>
+                <svg
+                  className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400'
+                  viewBox='0 0 20 20'
+                  fill='currentColor'>
+                  <path
+                    fillRule='evenodd'
+                    d='M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z'
+                    clipRule='evenodd'
+                  />
+                </svg>
+                <input
+                  type='text'
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder='Search by unit, tenant or status...'
+                  className='w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-200'
+                />
+              </div>
+              <div className='flex flex-wrap gap-2'>
+                {[
+                  { key: "all", label: `All Units (${allUnits.length})` },
+                  { key: "occupied", label: `Occupied (${occupiedCount})` },
+                  { key: "vacant", label: `Vacant (${vacantCount})` },
+                  {
+                    key: "maintenance",
+                    label: `Maintenance (${maintenanceCount})`,
+                  },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type='button'
+                    onClick={() => setUnitFilter(tab.key)}
+                    className='rounded-full px-4 py-1.5 text-sm font-semibold transition'
+                    style={
+                      unitFilter === tab.key
+                        ? { backgroundColor: "#0f172a", color: "#fff" }
+                        : { backgroundColor: "#f1f5f9", color: "#475569" }
+                    }>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Table */}
+            {paginatedUnits.length === 0 ? (
+              <div className='py-12 text-center text-sm text-slate-400'>
+                No units match your search or filter.
+              </div>
+            ) : (
+              <div className='overflow-x-auto'>
+                <table className='w-full text-sm'>
+                  <thead>
+                    <tr className='border-b border-slate-100'>
+                      {[
+                        "Unit Info",
+                        "Tenant Details",
+                        "Space & Lease",
+                        "Status",
+                        "Actions",
+                      ].map((col) => (
+                        <th
+                          key={col}
+                          className='px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400'>
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedUnits.map((unit) => {
+                      const status = getUnitStatus(unit);
+                      const initials = getInitials(unit.tenantName);
+                      const avatarColor = getAvatarColor(unit.tenantName);
+                      return (
+                        <tr
+                          key={unit.id}
+                          className='border-b border-slate-100 last:border-0 hover:bg-slate-50'>
+                          {/* Unit Info */}
+                          <td className='px-4 py-4'>
+                            <div className='flex items-center gap-3'>
+                              <div
+                                className='h-12 w-12 shrink-0 rounded-lg'
+                                style={{
+                                  background:
+                                    "linear-gradient(135deg, #2dd4bf, #3b82f6)",
+                                }}
+                              />
+                              <div>
+                                <p className='font-bold text-slate-900'>
+                                  {unit.unitCode || "Unit"}
+                                </p>
+                                <p className='text-xs text-slate-400'>
+                                  {unit.bedrooms} bed • {unit.bathrooms} bath
+                                  {unit.squareFeet
+                                    ? ` • ${unit.squareFeet} sqft`
+                                    : ""}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Tenant Details */}
+                          <td className='px-4 py-4'>
+                            {unit.tenantName ? (
+                              <div className='flex items-center gap-2.5'>
+                                <div
+                                  className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white'
+                                  style={{ backgroundColor: avatarColor }}>
+                                  {initials}
+                                </div>
+                                <div>
+                                  <p className='font-semibold text-slate-800'>
+                                    {unit.tenantName}
+                                  </p>
+                                  <p className='text-xs text-slate-400'>
+                                    Primary Tenant
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className='flex items-center gap-2.5'>
+                                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-500'>
+                                  —
+                                </div>
+                                <div>
+                                  <p className='text-sm font-medium text-slate-400'>
+                                    Not Assigned
+                                  </p>
+                                  <p className='text-xs text-slate-400'>
+                                    Ready for Lease
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Space & Lease */}
+                          <td className='px-4 py-4'>
+                            <p className='font-medium text-slate-700'>
+                              {unit.squareFeet
+                                ? `${Number(unit.squareFeet).toLocaleString()} sq ft`
+                                : "—"}
+                            </p>
+                            <p className='text-xs text-slate-400'>
+                              {unit.leaveDate
+                                ? `Ends ${new Date(unit.leaveDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                                : status === "occupied"
+                                  ? "Active lease"
+                                  : "Available Now"}
+                            </p>
+                          </td>
+
+                          {/* Status */}
+                          <td className='px-4 py-4'>
+                            {status === "occupied" && (
+                              <span className='inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700'>
+                                <span className='h-1.5 w-1.5 rounded-full bg-green-500' />
+                                OCCUPIED
+                              </span>
+                            )}
+                            {status === "vacant" && (
+                              <span className='inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600'>
+                                <span className='h-1.5 w-1.5 rounded-full bg-red-500' />
+                                VACANT
+                              </span>
+                            )}
+                            {status === "maintenance" && (
+                              <span className='inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700'>
+                                <span className='h-1.5 w-1.5 rounded-full bg-purple-500' />
+                                MAINTENANCE
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Actions */}
+                          <td className='px-4 py-4'>
+                            <div className='flex flex-wrap items-center gap-2'>
+                              {unit.tenantName ? (
+                                unit.leaveDate ? (
+                                  <button
+                                    type='button'
+                                    disabled
+                                    className='cursor-not-allowed rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-600 opacity-70'>
+                                    Leaving
+                                  </button>
+                                ) : (
+                                  <button
+                                    type='button'
+                                    onClick={() => openModal("remove", unit)}
+                                    className='rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100'>
+                                    Remove Tenant
+                                  </button>
+                                )
+                              ) : (
+                                <button
+                                  type='button'
+                                  onClick={() => openModal("add", unit)}
+                                  className='rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100'>
+                                  Add Tenant
+                                </button>
+                              )}
+                              <Link
+                                href={`/Units/${unit.id}`}
+                                className='rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>
+                                View Details
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {filteredUnits.length > 0 ? (
+              <div className='flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs text-slate-500'>
+                <p>
+                  Showing {(safePage - 1) * ITEMS_PER_PAGE + 1}–
+                  {Math.min(safePage * ITEMS_PER_PAGE, filteredUnits.length)} of{" "}
+                  {filteredUnits.length} units
                 </p>
-                <p className='mt-2 text-sm'>
-                  Lease:{" "}
-                  <span className='font-semibold'>
-                    {unit.leaseStatus || "vacant"}
-                  </span>
-                </p>
-                <p className='text-sm'>
-                  Tenant:{" "}
-                  <span className='font-semibold'>
-                    {unit.tenantName || "No tenant"}
-                  </span>
-                </p>
-                {unit.leaveDate ? (
-                  <p
-                    className='mt-2 text-sm font-semibold'
-                    style={{ color: "var(--warning, #f59e0b)" }}>
-                    Move-out: {new Date(unit.leaveDate).toLocaleDateString()}
-                  </p>
-                ) : null}
-                <div className='mt-4 flex flex-wrap gap-2'>
-                  {unit.tenantName ? (
-                    <>
-                      {unit.leaveDate ? (
-                        <button
-                          type='button'
-                          disabled
-                          className='rounded-full border px-4 py-2 text-xs font-bold cursor-not-allowed opacity-60'
-                          style={{
-                            borderColor: "var(--warning, #f59e0b)",
-                            color: "var(--warning, #f59e0b)",
-                          }}>
-                          Tenant Leaving
-                        </button>
+                <div className='flex items-center gap-1'>
+                  <button
+                    type='button'
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={safePage === 1}
+                    className='rounded-md border border-slate-200 px-2 py-1 font-bold disabled:opacity-40 hover:bg-slate-50'>
+                    ‹
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(
+                      (n) =>
+                        n === 1 ||
+                        n === totalPages ||
+                        Math.abs(n - safePage) <= 1,
+                    )
+                    .reduce((acc, n, i, arr) => {
+                      if (i > 0 && n - arr[i - 1] > 1) acc.push("...");
+                      acc.push(n);
+                      return acc;
+                    }, [])
+                    .map((item, i) =>
+                      item === "..." ? (
+                        <span
+                          key={`ellipsis-${i}`}
+                          className='px-1 text-slate-400'>
+                          …
+                        </span>
                       ) : (
                         <button
+                          key={item}
                           type='button'
-                          onClick={() => openModal("remove", unit)}
-                          className='rounded-full border px-4 py-2 text-xs font-bold transition hover:bg-red-50'
-                          style={{
-                            borderColor: "var(--danger, #dc2626)",
-                            color: "var(--danger, #dc2626)",
-                          }}>
-                          Remove Tenant
+                          onClick={() => setCurrentPage(item)}
+                          className='min-w-[28px] rounded-md border px-2 py-1 text-xs font-semibold'
+                          style={
+                            safePage === item
+                              ? {
+                                  backgroundColor: "#0f172a",
+                                  color: "#fff",
+                                  borderColor: "#0f172a",
+                                }
+                              : { borderColor: "#e2e8f0", color: "#475569" }
+                          }>
+                          {item}
                         </button>
-                      )}
-                    </>
-                  ) : (
-                    <button
-                      type='button'
-                      onClick={() => openModal("add", unit)}
-                      className='rounded-full px-4 py-2 text-xs font-bold text-white transition hover:brightness-110'
-                      style={{
-                        background:
-                          "linear-gradient(90deg, var(--accent), var(--primary))",
-                      }}>
-                      Add Tenant
-                    </button>
-                  )}
+                      ),
+                    )}
+                  <button
+                    type='button'
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    disabled={safePage === totalPages}
+                    className='rounded-md border border-slate-200 px-2 py-1 font-bold disabled:opacity-40 hover:bg-slate-50'>
+                    ›
+                  </button>
                 </div>
-              </article>
-            ))}
-          </section>
+              </div>
+            ) : null}
+          </div>
 
+          {/* Toast */}
           {actionMessage ? (
             <div
-              className='fixed right-4 bottom-4 z-50 max-w-sm rounded-2xl border px-4 py-3 text-sm font-semibold shadow-lg'
+              className='fixed bottom-4 right-4 z-50 max-w-sm rounded-2xl border px-4 py-3 text-sm font-semibold shadow-lg'
               style={
                 actionMessage.startsWith("Error:")
                   ? {
-                      borderColor: "var(--danger, #dc2626)",
-                      color: "var(--danger, #dc2626)",
-                      backgroundColor:
-                        "color-mix(in oklab, var(--danger, #dc2626) 10%, white)",
+                      borderColor: "#fca5a5",
+                      color: "#dc2626",
+                      backgroundColor: "#fef2f2",
                     }
                   : {
-                      borderColor: "var(--success, #16a34a)",
-                      color: "var(--success, #16a34a)",
-                      backgroundColor:
-                        "color-mix(in oklab, var(--success, #16a34a) 12%, white)",
+                      borderColor: "#86efac",
+                      color: "#16a34a",
+                      backgroundColor: "#f0fdf4",
                     }
               }>
               {actionMessage}

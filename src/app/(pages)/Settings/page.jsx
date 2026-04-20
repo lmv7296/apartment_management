@@ -9,6 +9,7 @@ import { APP_ROUTES } from "@/config/routes";
 const defaults = userPreferences.defaultSettings;
 
 export default function SettingsPage() {
+  const [isDark, setIsDark] = React.useState(false);
   const router = useRouter();
   const { status } = useSession();
 
@@ -18,6 +19,17 @@ export default function SettingsPage() {
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState("");
   const [success, setSuccess] = React.useState("");
+
+  React.useEffect(() => {
+    const savedTheme = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)",
+    ).matches;
+    const shouldUseDark = savedTheme ? savedTheme === "dark" : prefersDark;
+
+    document.documentElement.classList.toggle("dark", shouldUseDark);
+    setIsDark(shouldUseDark);
+  }, []);
 
   React.useEffect(() => {
     if (status === "unauthenticated") {
@@ -113,6 +125,13 @@ export default function SettingsPage() {
     );
   }
 
+  function toggleTheme() {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  }
+
   return (
     <main
       className='min-h-screen'
@@ -190,17 +209,28 @@ export default function SettingsPage() {
               {success}
             </p>
           ) : null}
-
-          <button
-            type='submit'
-            disabled={loading || saving}
-            className='rounded-full px-5 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60'
-            style={{
-              background:
-                "linear-gradient(90deg, var(--accent), var(--primary))",
-            }}>
-            {saving ? "Saving..." : "Save Settings"}
-          </button>
+          <div className='flex items-end gap-2'>
+            <button
+              type='submit'
+              disabled={loading || saving}
+              className='rounded-full px-5 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60'
+              style={{
+                background:
+                  "linear-gradient(90deg, var(--accent), var(--primary))",
+              }}>
+              {saving ? "Saving..." : "Save Settings"}
+            </button>
+            {/* <button
+              type='button'
+              onClick={toggleTheme}
+              className='rounded-full px-4 py-2 text-sm font-bold text-white transition hover:brightness-110'
+              style={{
+                background:
+                  "linear-gradient(90deg, var(--accent), var(--primary))",
+              }}>
+              {isDark ? "Switch to Light" : "Switch to Dark"}
+            </button> */}
+          </div>
         </form>
       </div>
     </main>

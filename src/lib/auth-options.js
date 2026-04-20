@@ -28,10 +28,12 @@ export const authOptions = {
 
         const { rows } = await query(
           `
-            SELECT id,company_id, name, email, role, unit_id, password_hash
-            FROM users
-            WHERE LOWER(email) = LOWER($1)
-              AND active = TRUE
+            SELECT u.id, u.company_id, u.name, u.email, u.role, u.unit_id, u.password_hash,
+                   c.name AS company_name
+            FROM users u
+            LEFT JOIN companies c ON c.id = u.company_id
+            WHERE LOWER(u.email) = LOWER($1)
+              AND u.active = TRUE
             LIMIT 1
           `,
           [credentials.email],
@@ -66,33 +68,36 @@ export const authOptions = {
           email: user.email,
           role: user.role,
           company_id: user.company_id,
+          company_name: user.company_name || null,
           unitId: user.unit_id,
         };
       },
     }),
   ],
-callbacks: {
-  async jwt({ token, user }) {
-    // When the user logs in, 'user' contains the data from your DB
-    if (user) {
-      token.id = user.id;
-      token.company_id = user.company_id;
-      token.role = user.role;
-      token.unit_id = user.unit_id;
-    }
-    return token;
+  callbacks: {
+    async jwt({ token, user }) {
+      // When the user logs in, 'user' contains the data from your DB
+      if (user) {
+        token.id = user.id;
+        token.company_id = user.company_id;
+        token.company_name = user.company_name;
+        token.role = user.role;
+        token.unit_id = user.unit_id;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      // Transfer the data from the token to the session object
+      if (session.user) {
+        session.user.id = token.id;
+        session.user.company_id = token.company_id;
+        session.user.company_name = token.company_name;
+        session.user.role = token.role;
+        session.user.unit_id = token.unit_id;
+      }
+      return session;
+    },
   },
-  async session({ session, token }) {
-    // Transfer the data from the token to the session object
-    if (session.user) {
-      session.user.id = token.id;
-      session.user.company_id = token.company_id;
-      session.user.role = token.role;
-      session.user.unit_id = token.unit_id;
-    }
-    return session;
-  }
-},
   pages: {
     signIn: "/Login",
   },
