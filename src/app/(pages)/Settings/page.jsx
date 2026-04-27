@@ -15,6 +15,9 @@ export default function SettingsPage() {
 
   const [currency, setCurrency] = React.useState(defaults.currency);
   const [language, setLanguage] = React.useState(defaults.language);
+  const [unitPrefix, setUnitPrefix] = React.useState(defaults.unitPrefix || "Unit");
+  const [unitCount, setUnitCount] = React.useState(String(defaults.unitCount ?? 0));
+
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState("");
@@ -62,6 +65,8 @@ export default function SettingsPage() {
         if (!cancelled) {
           setCurrency(payload.currency || defaults.currency);
           setLanguage(payload.language || defaults.language);
+          setUnitPrefix(payload.unitPrefix ?? defaults.unitPrefix ?? "Unit");
+          setUnitCount(String(payload.unitCount ?? defaults.unitCount ?? 0));
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -87,13 +92,26 @@ export default function SettingsPage() {
     setError("");
     setSuccess("");
 
+    const parsedUnitCount = Number.parseInt(unitCount || "0", 10);
+
+    if (Number.isNaN(parsedUnitCount) || parsedUnitCount < 0) {
+      setSaving(false);
+      setError("Unit count must be a non-negative number.");
+      return;
+    }
+
     try {
       const response = await fetch("/api/v1/user-settings", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ currency, language }),
+        body: JSON.stringify({
+          currency,
+          language,
+          unitPrefix,
+          unitCount: parsedUnitCount,
+        }),
       });
 
       if (!response.ok) {
@@ -140,8 +158,7 @@ export default function SettingsPage() {
         <section>
           <h1 className='text-3xl font-black'>User Settings</h1>
           <p className='mt-1 app-text-muted'>
-            Set your preferred currency now. Language will be used by translated
-            UI copy in future pages.
+            Set currency and default unit generation behavior for new properties.
           </p>
         </section>
 
@@ -178,14 +195,16 @@ export default function SettingsPage() {
             </select>
           </div>
 
-          {/* <div>
-            <label htmlFor='language' className='mb-1 block text-sm font-semibold'>
-              Language
+          <div>
+            <label
+              htmlFor='unitPrefix'
+              className='mb-1 block text-sm font-semibold'>
+              Preferred Unit Prefix
             </label>
             <select
-              id='language'
-              value={language}
-              onChange={(event) => setLanguage(event.target.value)}
+              id='unitPrefix'
+              value={unitPrefix}
+              onChange={(event) => setUnitPrefix(event.target.value)}
               disabled={loading || saving}
               className='w-full rounded-lg border px-3 py-2 text-sm'
               style={{
@@ -193,13 +212,39 @@ export default function SettingsPage() {
                 backgroundColor: "var(--surface-2)",
                 color: "var(--text)",
               }}>
-              {userPreferences.languages.map((item) => (
-                <option key={item.code} value={item.code}>
+              {userPreferences.unitPrefixes.map((item) => (
+                <option key={item.code || "none"} value={item.code}>
                   {item.label}
                 </option>
               ))}
             </select>
-          </div> */}
+          </div>
+
+          <div>
+            <label
+              htmlFor='unitCount'
+              className='mb-1 block text-sm font-semibold'>
+              Preferred Default Unit Count
+            </label>
+            <input
+              id='unitCount'
+              type='number'
+              min='0'
+              step='1'
+              value={unitCount}
+              onChange={(event) => setUnitCount(event.target.value)}
+              disabled={loading || saving}
+              className='w-full rounded-lg border px-3 py-2 text-sm'
+              style={{
+                borderColor: "var(--border)",
+                backgroundColor: "var(--surface-2)",
+                color: "var(--text)",
+              }}
+            />
+            <p className='mt-1 text-xs app-text-muted'>
+              This pre-fills total units when you create a new property.
+            </p>
+          </div>
 
           {error ? (
             <p className='text-sm [color:var(--danger)]'>{error}</p>

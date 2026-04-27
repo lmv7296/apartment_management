@@ -77,3 +77,20 @@ export async function withRLS(user, callback) {
     client.release();
   }
 }
+/**
+ * Use this for: any multi-statement operation that must be atomic.
+ */
+export async function transaction(callback) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}

@@ -5,7 +5,7 @@
         {
           "id": "add-property",
           "label": "+ Add Property",
-          "href": "/properties/new",
+          "href": "/Properties",
           "className": "hover:brightness-110",
           "style": {
             "background": "linear-gradient(90deg, var(--accent), var(--primary))"

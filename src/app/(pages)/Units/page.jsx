@@ -5,8 +5,53 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { APP_ROUTES } from "@/config/routes";
 
+const FILTER_OPTIONS = [
+  { value: "unit_info", label: "Unit Info" },
+  { value: "tenant_details", label: "Tenant Details" },
+  { value: "space_lease", label: "Space & Lease" },
+  { value: "status", label: "Status" },
+];
+
+function matchesFilter(apartment, filterBy, search) {
+  const q = search.trim().toLowerCase();
+  if (!q) return true;
+  switch (filterBy) {
+    case "unit_info":
+      return (apartment.unit_code || "").toLowerCase().includes(q);
+    case "tenant_details":
+      return (
+        (apartment.tenant_name || "").toLowerCase().includes(q) ||
+        (apartment.tenant_email || "").toLowerCase().includes(q)
+      );
+    case "space_lease": {
+      const beds = String(apartment.bedrooms ?? "");
+      const baths = String(apartment.bathrooms ?? "");
+      const sqft = String(apartment.square_feet ?? apartment.squareFeet ?? "");
+      const rent = String(apartment.monthly_rent ?? "");
+      return (
+        beds.includes(q) ||
+        baths.includes(q) ||
+        sqft.includes(q) ||
+        rent.includes(q)
+      );
+    }
+    case "status": {
+      const isRented =
+        typeof apartment.is_rented === "boolean"
+          ? apartment.is_rented
+          : String(apartment.lease_status || "").toLowerCase() === "active";
+      const label = isRented ? "rented" : "vacant";
+      return label.includes(q);
+    }
+    default:
+      return true;
+  }
+}
+
 export default function UnitsPage() {
   const [apartments, setApartments] = React.useState([]);
+  const [filterBy, setFilterBy] = React.useState("unit_info");
+  const [search, setSearch] = React.useState("");
   const { status } = useSession();
   const router = useRouter();
   const [error, setError] = React.useState("");
@@ -38,6 +83,11 @@ export default function UnitsPage() {
     }
   }, [status]);
 
+  const filtered = React.useMemo(
+    () => apartments.filter((a) => matchesFilter(a, filterBy, search)),
+    [apartments, filterBy, search],
+  );
+
   //   return (
   //     <>
   //       <ul>
@@ -65,6 +115,82 @@ export default function UnitsPage() {
         </div>
       </section>
 
+      {/* Filter bar */}
+      <div className='mb-6 flex flex-col gap-3 sm:flex-row sm:items-center'>
+        <div
+          className='flex overflow-hidden rounded-xl border'
+          style={{
+            borderColor: "var(--border)",
+            backgroundColor: "var(--surface)",
+          }}>
+          {FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type='button'
+              onClick={() => {
+                setFilterBy(opt.value);
+                setSearch("");
+              }}
+              className='px-4 py-2 text-xs font-bold uppercase tracking-widest transition'
+              style={{
+                background:
+                  filterBy === opt.value
+                    ? "linear-gradient(90deg, var(--accent), var(--primary))"
+                    : "transparent",
+                color:
+                  filterBy === opt.value
+                    ? "#fff"
+                    : "var(--text-muted, var(--text))",
+              }}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {filterBy === "status" ? (
+          <select
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className='flex-1 rounded-xl border px-4 py-2 text-sm'
+            style={{
+              borderColor: "var(--border)",
+              backgroundColor: "var(--surface)",
+              color: "var(--text)",
+            }}>
+            <option value=''>All</option>
+            <option value='rented'>Rented</option>
+            <option value='vacant'>Vacant</option>
+          </select>
+        ) : (
+          <input
+            type='search'
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={
+              filterBy === "unit_info"
+                ? "Search by unit name…"
+                : filterBy === "tenant_details"
+                  ? "Search by tenant name or email…"
+                  : filterBy === "space_lease"
+                    ? "Search by beds, baths, sqft, or rent…"
+                    : "Search…"
+            }
+            className='flex-1 rounded-xl border px-4 py-2 text-sm'
+            style={{
+              borderColor: "var(--border)",
+              backgroundColor: "var(--surface)",
+              color: "var(--text)",
+            }}
+          />
+        )}
+
+        {search ? (
+          <span className='text-xs app-text-muted whitespace-nowrap'>
+            {filtered.length} of {apartments.length} units
+          </span>
+        ) : null}
+      </div>
+
       {error ? (
         <div
           className='mb-6 rounded-2xl border px-4 py-3 text-sm font-semibold'
@@ -90,9 +216,21 @@ export default function UnitsPage() {
             Add units in the database to see them here.
           </p>
         </div>
+      ) : filtered.length === 0 ? (
+        <div
+          className='rounded-2xl border border-dashed p-10 text-center'
+          style={{
+            borderColor: "var(--border)",
+            backgroundColor: "var(--surface)",
+          }}>
+          <h2 className='text-xl font-bold'>No matching units</h2>
+          <p className='mt-2 app-text-muted'>
+            Try a different search term or filter.
+          </p>
+        </div>
       ) : (
         <div className='grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3'>
-          {apartments.map((apartment) => {
+          {filtered.map((apartment) => {
             const propertyId = apartment.property_id;
             const targetHref = `/Units/${apartment.id}`;
             const leaseStatus = String(

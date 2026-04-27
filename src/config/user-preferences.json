@@ -1,8 +1,16 @@
 {
   "defaultSettings": {
     "currency": "USD",
-    "language": "en"
+    "language": "en",
+    "unitPrefix": "Unit",
+    "unitCount": 0
   },
+  "unitPrefixes": [
+    { "code": "Unit", "label": "Unit 1, Unit 2, ..." },
+    { "code": "Apt",  "label": "Apt 1, Apt 2, ..." },
+    { "code": "#",    "label": "#1, #2, ..." },
+    { "code": "",     "label": "1, 2, 3 (no prefix)" }
+  ],
   "currencies": [
     { "code": "USD", "label": "US Dollar (USD)" },
     { "code": "EUR", "label": "Euro (EUR)" },
