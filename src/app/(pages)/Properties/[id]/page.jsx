@@ -77,11 +77,59 @@ export default function PropertyDetailsPage() {
 
     try {
       if (modalMode === "add") {
-        // Add tenant
-        setActionMessage(
-          `Tenant details prepared for ${activeUnit?.unitCode || "unit"}.`,
+        const propertyId = String(params?.id || "");
+        const response = await fetch(
+          `/api/v1/Properties/${propertyId}/add-tenant`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              unitId: activeUnit?.id,
+              fullName: formData.add.fullName,
+              email: formData.add.email,
+              phone: formData.add.phone,
+              startDate: formData.add.startDate,
+              monthlyRent: formData.add.monthlyRent,
+              notes: formData.add.notes,
+              currency: formData.add.currency,
+            }),
+          },
         );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.error || "Failed to add tenant");
+        }
+
+        setActionMessage(
+          `${data?.createdUser ? "New user created" : "Existing user matched"} and assigned to ${activeUnit?.unitCode || "unit"}.`,
+        );
+        setFormData((prev) => ({
+          ...prev,
+          add: {
+            fullName: "",
+            email: "",
+            phone: "",
+            startDate: "",
+            monthlyRent: "",
+            currency: userCurrency,
+            notes: "",
+          },
+        }));
         closeModal();
+
+        // Reload property data
+        const propertyResponse = await fetch(
+          `/api/v1/Properties/${propertyId}`,
+          {
+            cache: "no-store",
+          },
+        );
+        const propertyData = await propertyResponse.json();
+        setProperty(propertyData);
       } else if (modalMode === "remove") {
         // Remove tenant
         const propertyId = String(params?.id || "");

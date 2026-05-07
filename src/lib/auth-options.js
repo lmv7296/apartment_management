@@ -4,6 +4,23 @@ import { hashPassword, verifyPassword } from "@/lib/password";
 
 const DEMO_PASSWORD = process.env.NEXTAUTH_DEMO_PASSWORD || "demo123";
 
+async function getActiveUserById(userId) {
+  const { rows } = await query(
+    `
+      SELECT u.id, u.company_id, u.name, u.email, u.role, u.unit_id,
+             c.name AS company_name
+      FROM users u
+      LEFT JOIN companies c ON c.id = u.company_id
+      WHERE u.id = $1
+        AND u.active = TRUE
+      LIMIT 1
+    `,
+    [userId],
+  );
+
+  return rows[0] || null;
+}
+
 function isValidDemoPassword(inputPassword) {
   const value = String(inputPassword || "").trim();
   const allowed = new Set([String(DEMO_PASSWORD || "").trim(), "demo123"]);
@@ -69,7 +86,7 @@ export const authOptions = {
           role: user.role,
           company_id: user.company_id,
           company_name: user.company_name || null,
-          unitId: user.unit_id,
+          unit_id: user.unit_id,
         };
       },
     }),
@@ -83,10 +100,58 @@ export const authOptions = {
         token.company_name = user.company_name;
         token.role = user.role;
         token.unit_id = user.unit_id;
+        token.db_valid = true;
       }
+
+      if (!token?.id) {
+        return token;
+      }
+
+      try {
+        const dbUser = await getActiveUserById(token.id);
+
+        if (!dbUser) {
+          delete token.id;
+          delete token.name;
+          delete token.email;
+          delete token.company_id;
+          delete token.company_name;
+          delete token.role;
+          delete token.unit_id;
+          token.db_valid = false;
+          return token;
+        }
+
+        token.id = dbUser.id;
+        token.name = dbUser.name;
+        token.email = dbUser.email;
+        token.company_id = dbUser.company_id;
+        token.company_name = dbUser.company_name;
+        token.role = dbUser.role;
+        token.unit_id = dbUser.unit_id;
+        token.db_valid = true;
+      } catch {
+        delete token.id;
+        delete token.name;
+        delete token.email;
+        delete token.company_id;
+        delete token.company_name;
+        delete token.role;
+        delete token.unit_id;
+        token.db_valid = false;
+        return token;
+      }
+
       return token;
     },
     async session({ session, token }) {
+      if (!token?.db_valid || !token?.id) {
+        return {
+          ...session,
+          user: undefined,
+        };
+      }
+
       // Transfer the data from the token to the session object
       if (session.user) {
         session.user.id = token.id;

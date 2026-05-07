@@ -41,6 +41,21 @@ const queryGetUnitById = `
   LIMIT 1
 `;
 
+const queryGetLeaseHistory = `
+  SELECT
+    l.id,
+    l.status,
+    l.start_date AS "startDate",
+    l.end_date AS "endDate",
+    l.monthly_rent AS "monthlyRent",
+    l.leave_date AS "leaveDate",
+    tenant.name AS "tenantName"
+  FROM leases l
+  LEFT JOIN users tenant ON tenant.id = l.user_id
+  WHERE l.unit_id = $1::uuid
+  ORDER BY l.end_date DESC NULLS LAST, l.start_date DESC NULLS LAST
+`;
+
 export async function GET(_request, { params: paramsPromise }) {
   try {
     const session = await getServerSession(authOptions);
@@ -61,8 +76,9 @@ export async function GET(_request, { params: paramsPromise }) {
 
     // Pass the session user to withRLS
     return await withRLS(session.user, async (tx) => {
-      const [unitRes] = await Promise.all([
+      const [unitRes, leaseHistoryRes] = await Promise.all([
         tx.query(queryGetUnitById, [unitId]),
+        tx.query(queryGetLeaseHistory, [unitId]),
       ]);
       const unit = unitRes.rows[0];
 
@@ -70,7 +86,10 @@ export async function GET(_request, { params: paramsPromise }) {
         return NextResponse.json({ error: "Unit not found" }, { status: 404 });
       }
 
-      return NextResponse.json(unit);
+      return NextResponse.json({
+        ...unit,
+        leaseHistory: leaseHistoryRes.rows,
+      });
     });
   } catch (error) {
     console.error(error);

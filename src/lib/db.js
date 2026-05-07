@@ -1,54 +1,42 @@
-// import pg from "pg";
+import { Pool } from "pg";
 
-// const { Pool } = pg;
+const connectionString =
+  process.env.SUPABASE_DB_URL ||
+  process.env.DATABASE_URL ||
+  (process.env.PGHOST && process.env.PGUSER && process.env.PGDATABASE
+    ? `postgresql://${encodeURIComponent(process.env.PGUSER)}:${encodeURIComponent(
+        process.env.PGPASSWORD || "",
+      )}@${process.env.PGHOST}:${process.env.PGPORT || "5432"}/${encodeURIComponent(
+        process.env.PGDATABASE,
+      )}`
+    : null);
 
-// let pool;
+if (!connectionString) {
+  throw new Error(
+    "Missing database connection. Set SUPABASE_DB_URL (preferred) or DATABASE_URL.",
+  );
+}
 
-// function getPool() {
-//   if (!pool) {
-//     pool = new Pool({
-//       host: process.env.PGHOST,
-//       port: Number(process.env.PGPORT || 5432),
-//       user: process.env.PGUSER,
-//       password: process.env.PGPASSWORD,
-//       database: process.env.PGDATABASE,
-//       max: 10,
-//       idleTimeoutMillis: 30000,
-//       connectionTimeoutMillis: 5000,
-//     });
-//   }
-
-//   return pool;
-// }
-
-// export async function query(text, params = []) {
-//   const client = getPool();
-//   return client.query(text, params);
-// }
-
-// export async function closePool() {
-//   if (pool) {
-//     await pool.end();
-//     pool = undefined;
-//   }
-// }
-
-import { Pool } from 'pg';
+const useSsl =
+  process.env.DB_SSL === "true" ||
+  connectionString.includes("supabase.co") ||
+  connectionString.includes("pooler.supabase.com");
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   max: 10,
   idleTimeoutMillis: 30000,
+  ssl: useSsl ? { rejectUnauthorized: false } : undefined,
 });
 
-/** * 
+/** *
  * Use this for: Login, Sign up, or Public data.
  */
 export async function query(text, params) {
   return pool.query(text, params);
 }
 
-/** * 
+/** *
  * Use this for: Everything else (Properties, Units, Payments).
  */
 export async function withRLS(user, callback) {
@@ -56,22 +44,34 @@ export async function withRLS(user, callback) {
 
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    
+    await client.query("BEGIN");
+
     // Injecting the "Passport" into the database session
-    await client.query(`SELECT set_config('app.current_company_id', $1::text, true)`, [user.company_id]);
-    await client.query(`SELECT set_config('app.user_role', $1::text, true)`, [user.role]);
-    
+    if (user.company_id) {
+      await client.query(
+        `SELECT set_config('app.current_company_id', $1::text, true)`,
+        [user.company_id],
+      );
+    }
+    if (user.role) {
+      await client.query(`SELECT set_config('app.user_role', $1::text, true)`, [
+        user.role,
+      ]);
+    }
+
     if (user.unit_id) {
-      await client.query(`SELECT set_config('app.user_unit_id', $1::text, true)`, [user.unit_id]);
+      await client.query(
+        `SELECT set_config('app.user_unit_id', $1::text, true)`,
+        [user.unit_id],
+      );
     }
 
     const result = await callback(client);
-    
-    await client.query('COMMIT');
+
+    await client.query("COMMIT");
     return result;
   } catch (e) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw e;
   } finally {
     client.release();
@@ -83,14 +83,18 @@ export async function withRLS(user, callback) {
 export async function transaction(callback) {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
     const result = await callback(client);
-    await client.query('COMMIT');
+    await client.query("COMMIT");
     return result;
   } catch (e) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw e;
   } finally {
     client.release();
   }
+}
+
+export async function closePool() {
+  await pool.end();
 }
