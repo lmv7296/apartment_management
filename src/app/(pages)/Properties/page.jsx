@@ -77,7 +77,9 @@ export default function PropertiesPage() {
 
     async function loadUnitPreferences() {
       try {
-        const response = await fetch("/api/v1/user-settings", { cache: "no-store" });
+        const response = await fetch("/api/v1/user-settings", {
+          cache: "no-store",
+        });
         if (!response.ok) return;
 
         const payload = await response.json();
