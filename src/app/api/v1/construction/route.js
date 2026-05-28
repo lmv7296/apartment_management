@@ -23,6 +23,7 @@ export async function POST(request) {
       budget_total,
       estimated_completion,
       contractor_name,
+      phases,
     } = body;
 
     // Validation: Ensure required fields are present
@@ -61,7 +62,7 @@ export async function POST(request) {
           address,
           city,
           state,
-          zip,
+          zip || body.zipcode,
           country,
           permit_number,
           budget_total || 0,
@@ -73,22 +74,32 @@ export async function POST(request) {
 
       const newProject = result.rows[0];
 
-      // 2. Optional: Initialize default phases for the new project
-      // This ensures the "Phase Cards" in the UI aren't empty on creation
-      const defaultPhases = [
-        ["Excavation", 0, "Pending", 1],
-        ["Structure", 0, "Pending", 2],
-        ["Facade", 0, "Pending", 3],
-        ["Interior", 0, "Pending", 4],
-      ];
+      // 2. Insert Custom or Default Phases
+      const phasesToInsert =
+        phases && Array.isArray(phases) && phases.length > 0
+          ? phases
+          : [
+              { label: "Excavation", progress: 0, PhaseSteps: [] },
+              { label: "Structure", progress: 0, PhaseSteps: [] },
+              { label: "Facade", progress: 0, PhaseSteps: [] },
+              { label: "Interior", progress: 0, PhaseSteps: [] },
+            ];
 
-      for (const phase of defaultPhases) {
+      for (let i = 0; i < phasesToInsert.length; i++) {
+        const p = phasesToInsert[i];
         await tx.query(
           `
-          INSERT INTO project_phases (project_id, label, progress, status, step_order)
-          VALUES ($1, $2, $3, $4, $5)
+          INSERT INTO project_phases (project_id, label, progress, status, step_order, "PhaseSteps")
+          VALUES ($1, $2, $3, $4, $5, $6)
         `,
-          [newProject.id, ...phase],
+          [
+            newProject.id,
+            p.label,
+            p.progress || 0,
+            p.progress === 100 ? "Completed" : "Pending",
+            i + 1,
+            JSON.stringify(p.PhaseSteps || []),
+          ],
         );
       }
 
@@ -125,7 +136,7 @@ export async function GET() {
           (
             SELECT json_agg(phases_sorted)
             FROM (
-              SELECT label, progress, status 
+              SELECT label, progress, status, "PhaseSteps"
               FROM project_phases 
               WHERE project_id = p.id 
               ORDER BY step_order ASC

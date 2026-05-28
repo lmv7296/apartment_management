@@ -4,6 +4,8 @@ import React from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import BasicModal from "@/app/components/basic-modal";
+import Progress from "./Progress";
 
 const MapView = dynamic(() => import("@/app/components/maps/MapView"), {
   ssr: false,
@@ -12,11 +14,77 @@ const MapView = dynamic(() => import("@/app/components/maps/MapView"), {
   ),
 });
 
+const INITIAL_FORM = {
+  name: "",
+  propertyType: "Apartment",
+  address: "",
+  city: "",
+  state: "",
+  zip: "",
+  totalUnits: "",
+  yearBuilt: String(new Date().getFullYear()),
+  squareFeet: "",
+  amenities: {
+    privateParking: false,
+    fitnessCenter: false,
+    infinityPool: false,
+    security247: false,
+  },
+  underConstruction: false,
+  phases: [], // Added to support custom phases and steps
+};
+
 export default function ProjectDetailView() {
   const { id } = useParams(); // Get ID from [id] folder
   const [project, setProject] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
+  const [isUpdating, setIsUpdating] = React.useState(false);
+  const [updateError, setUpdateError] = React.useState(null);
+
+  const handleUpdateProgress = async (projectId, updatedPhases) => {
+    setIsUpdating(true);
+    setUpdateError(null);
+    try {
+      // Recalculate total project completion percentage based on all phases
+      const totalPhases = updatedPhases.length;
+      const totalProgress = updatedPhases.reduce(
+        (acc, p) => acc + (p.progress || 0),
+        0,
+      );
+      const newTotalCompletion =
+        totalPhases > 0 ? Math.round(totalProgress / totalPhases) : 0;
+
+      const res = await fetch(`/api/v1/construction/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phases: updatedPhases,
+          total_completion_pct: newTotalCompletion,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update project progress");
+      const data = await res.json();
+      setProject(data); // Update local state with the saved data
+      return true; // Return success to close the modal
+    } catch (err) {
+      setUpdateError(err.message);
+      return false;
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const [formData, setFormData] = React.useState(INITIAL_FORM);
+
+  function onChangeForm(event) {
+    const { name, type, value, checked } = event.target;
+    setFormData((current) => ({
+      ...current,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  }
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -176,45 +244,12 @@ export default function ProjectDetailView() {
         {/* Main Column */}
         <div className='space-y-8 lg:col-span-8'>
           {/* Phase Grid - Mapped from DB JSON */}
-          <div className='grid grid-cols-2 gap-4 md:grid-cols-4'>
-            {project.phases?.map((phase) => (
-              <div
-                key={phase.label}
-                className='rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md'>
-                <span className='text-[10px] font-bold uppercase tracking-wider text-slate-400'>
-                  {phase.label}
-                </span>
-                <div className='my-2 flex items-center justify-between'>
-                  <span className='text-xl font-black text-[#001f3f]'>
-                    {phase.progress}%
-                  </span>
-                  {phase.progress === 100 && (
-                    <span className='text-emerald-500'>
-                      <svg
-                        xmlns='http://www.w3.org/2000/svg'
-                        width='18'
-                        height='18'
-                        viewBox='0 0 24 24'
-                        fill='none'
-                        stroke='currentColor'
-                        strokeWidth='3'
-                        strokeLinecap='round'
-                        strokeLinejoin='round'>
-                        <path d='M20 6 9 17l-5-5' />
-                      </svg>
-                    </span>
-                  )}
-                </div>
-                <div className='h-1.5 w-full rounded-full bg-slate-100'>
-                  <div
-                    className='h-full rounded-full bg-[#001f3f]'
-                    style={{ width: `${phase.progress}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-
+          <Progress
+            project={project}
+            onSubmit={handleUpdateProgress}
+            isSubmitting={isUpdating}
+            error={updateError}
+          />
           {/* Activity Feed - Dynamic from Logs */}
           <div className='space-y-4'>
             <h4 className='text-xs font-bold uppercase tracking-widest text-slate-400'>

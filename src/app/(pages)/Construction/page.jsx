@@ -41,6 +41,7 @@ export default function Construction() {
   const handleProjectSave = async (payload) => {
     try {
       setIsLoading(true);
+      console.log("Submitting Construction Payload:", payload);
       const res = await fetch("/api/v1/construction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,7 +178,7 @@ export default function Construction() {
                     <div className='h-2 w-full rounded-full bg-slate-100'>
                       <div
                         className='h-full rounded-full bg-[#001f3f] transition-all duration-1000'
-                        style={{ width: `${building.progress || 10}%` }}
+                        style={{ width: `${building.progress || 0}%` }}
                       />
                     </div>
                   </div>
