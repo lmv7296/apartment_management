@@ -19,6 +19,7 @@ const INITIAL_FORM = {
     infinityPool: false,
     security247: false,
   },
+  underConstruction: false,
 };
 
 export default function NewProperty({
@@ -37,7 +38,8 @@ export default function NewProperty({
       setFormData({
         ...INITIAL_FORM,
         totalUnits:
-          Number.isFinite(Number(defaultUnitCount)) && Number(defaultUnitCount) > 0
+          Number.isFinite(Number(defaultUnitCount)) &&
+          Number(defaultUnitCount) > 0
             ? String(defaultUnitCount)
             : "",
       });
@@ -48,8 +50,11 @@ export default function NewProperty({
   }, [isOpen, defaultUnitCount]);
 
   function onChangeForm(event) {
-    const { name, value } = event.target;
-    setFormData((current) => ({ ...current, [name]: value }));
+    const { name, type, value, checked } = event.target;
+    setFormData((current) => ({
+      ...current,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   }
 
   function onToggleAmenity(event) {
@@ -130,13 +135,6 @@ export default function NewProperty({
             }}
             disabled={isSubmitting}>
             <span className='inline-flex items-center gap-2'>
-              <svg className='h-4 w-4' viewBox='0 0 20 20' fill='currentColor'>
-                <path
-                  fillRule='evenodd'
-                  d='M10 1a3 3 0 00-3 3v1H6a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-1V4a3 3 0 00-3-3zm1 4V4a1 1 0 10-2 0v1h2z'
-                  clipRule='evenodd'
-                />
-              </svg>
               {isSubmitting ? "Saving..." : "Save Property"}
             </span>
           </button>
@@ -153,9 +151,6 @@ export default function NewProperty({
             backgroundColor: "var(--surface)",
           }}>
           <h4 className='mb-4 flex items-center gap-2 text-lg font-black text-slate-900'>
-            <span className='inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold'>
-              i
-            </span>
             Basic Information
           </h4>
           <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
@@ -275,7 +270,7 @@ export default function NewProperty({
             }}>
             <h4 className='mb-4 text-lg font-black text-slate-900'>Media</h4>
             <div
-              className='mb-3 flex min-h-[120px] items-center justify-center rounded-xl border border-dashed text-center text-sm font-semibold text-slate-500'
+              className='mb-3 flex min-h-30 items-center justify-center rounded-xl border border-dashed text-center text-sm font-semibold text-slate-500'
               style={{
                 borderColor: "var(--border)",
                 backgroundColor: "var(--surface-2)",
