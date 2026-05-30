@@ -1,6 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import React from "react";
+import { useSession } from "next-auth/react";
+import { APP_ROUTES } from "@/config/routes";
+import { useRouter } from "next/navigation";
 
 const featurePillars = [
   {
@@ -36,6 +40,14 @@ const highlights = [
 ];
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  React.useEffect(() => {
+    if (status === "authenticated") {
+      router.replace(APP_ROUTES.dashboard);
+      return;
+    }
+  }, [status, router]);
   return (
     <main className='mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8'>
       <section

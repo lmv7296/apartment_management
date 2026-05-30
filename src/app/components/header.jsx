@@ -212,7 +212,7 @@ export default function Header() {
             href='/Properties'
             className='rounded-lg px-4 py-2 text-sm font-bold text-white'
             style={{ backgroundColor: "#0f172a" }}>
-            Add Property
+            Property
           </Link>
 
           {/* Avatar dropdown */}

@@ -20,9 +20,9 @@ const queryGetProperties = `
 
 const queryCreateProperty = `
   INSERT INTO public.properties
-    (name, address, city, state, zip, property_type, total_units, year_built, square_feet, amenities)
+    (name, address, city, state, zip, property_type, total_units, year_built, square_feet, amenities, under_construction)
   VALUES
-    ($1, $2, NULLIF($3, ''), NULLIF($4, ''), NULLIF($5, ''), $6, $7, $8, $9, $10)
+    ($1, $2, NULLIF($3, ''), NULLIF($4, ''), NULLIF($5, ''), $6, $7, $8, $9, $10, $11)
   RETURNING
     id,
     name,
@@ -35,6 +35,7 @@ const queryCreateProperty = `
     year_built AS "yearBuilt",
     square_feet AS "squareFeet",
     amenities,
+    under_construction AS "underConstruction",
     created_at AS "createdAt"
 `;
 
@@ -117,6 +118,7 @@ export async function POST(request) {
         yearBuilt,
         squareFeet,
         JSON.stringify(amenities),
+        Boolean(body?.underConstruction),
       ]);
 
       const property = propertyRes.rows[0];
