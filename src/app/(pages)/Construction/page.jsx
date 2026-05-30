@@ -117,90 +117,101 @@ export default function Construction() {
         </div>
 
         <div className='grid grid-cols-1 gap-6'>
-          {construction?.map((building) => (
-            <Link
-              key={building.id}
-              href={`/Construction/${building.id}`}
-              className='rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>
-              <div className='group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white transition-all hover:shadow-lg md:flex-row'>
-                {/* Image Placeholder - Matching the left-side images in image_8fad32.jpg */}
-                <div className='h-48 w-full bg-slate-200 md:h-auto md:w-72 lg:w-80'>
-                  <div className='flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200'>
-                    <svg
-                      className='h-12 w-12 text-slate-300'
-                      fill='currentColor'
-                      viewBox='0 0 24 24'>
-                      <path d='M19 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 2h2v5h-2V4zm-4 0h2v5H8V4zm0 16v-9h2v9H8zm4 0v-9h2v9h-2zm4 0v-9h2v9h-2zm0-11V4h2v5h-2z' />
-                    </svg>
-                  </div>
-                </div>
+          {construction?.map((building) => {
+            const phases = building.phases || [];
+            const calculatedProgress =
+              phases.length > 0
+                ? Math.round(
+                    phases.reduce((acc, p) => acc + (p.progress || 0), 0) /
+                      phases.length,
+                  )
+                : building.progress || 0;
 
-                {/* Content Area */}
-                <div className='flex flex-1 flex-col p-6'>
-                  <div className='mb-4 flex items-start justify-between'>
-                    <div>
-                      <h3 className='text-lg font-bold text-[#001f3f]'>
-                        {building.name}
-                      </h3>
-                      <div className='mt-1 flex items-center gap-1.5 text-xs font-bold text-slate-500'>
-                        <svg
-                          className='h-3.5 w-3.5'
-                          fill='none'
-                          viewBox='0 0 24 24'
-                          stroke='currentColor'>
-                          <path
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                            strokeWidth={2}
-                            d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z'
-                          />
-                        </svg>
-                        {building.location || "District Waterfront, Sector 4"}
+            return (
+              <Link
+                key={building.id}
+                href={`/Construction/${building.id}`}
+                className='rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>
+                <div className='group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white transition-all hover:shadow-lg md:flex-row'>
+                  {/* Image Placeholder - Matching the left-side images in image_8fad32.jpg */}
+                  <div className='h-48 w-full bg-slate-200 md:h-auto md:w-72 lg:w-80'>
+                    <div className='flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200'>
+                      <svg
+                        className='h-12 w-12 text-slate-300'
+                        fill='currentColor'
+                        viewBox='0 0 24 24'>
+                        <path d='M19 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 2h2v5h-2V4zm-4 0h2v5H8V4zm0 16v-9h2v9H8zm4 0v-9h2v9h-2zm4 0v-9h2v9h-2zm0-11V4h2v5h-2z' />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Content Area */}
+                  <div className='flex flex-1 flex-col p-6'>
+                    <div className='mb-4 flex items-start justify-between'>
+                      <div>
+                        <h3 className='text-lg font-bold text-[#001f3f]'>
+                          {building.name}
+                        </h3>
+                        <div className='mt-1 flex items-center gap-1.5 text-xs font-bold text-slate-500'>
+                          <svg
+                            className='h-3.5 w-3.5'
+                            fill='none'
+                            viewBox='0 0 24 24'
+                            stroke='currentColor'>
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={2}
+                              d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z'
+                            />
+                          </svg>
+                          {building.location || "District Waterfront, Sector 4"}
+                        </div>
+                      </div>
+
+                      {/* Status Badge */}
+                      <span className='rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-600'>
+                        {building.status || "In Progress"}
+                      </span>
+                    </div>
+
+                    {/* Progress Bar - Matching the "Construction Progress" style in image_8fad32.jpg */}
+                    <div className='mb-6 mt-auto'>
+                      <div className='mb-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-tight'>
+                        <span className='text-slate-400'>
+                          Construction Progress
+                        </span>
+                        <span className='text-[#001f3f]'>
+                          {calculatedProgress}%
+                        </span>
+                      </div>
+                      <div className='h-2 w-full rounded-full bg-slate-100'>
+                        <div
+                          className='h-full rounded-full bg-[#001f3f] transition-all duration-1000'
+                          style={{ width: `${calculatedProgress}%` }}
+                        />
                       </div>
                     </div>
 
-                    {/* Status Badge */}
-                    <span className='rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-600'>
-                      {building.status || "In Progress"}
-                    </span>
-                  </div>
-
-                  {/* Progress Bar - Matching the "Construction Progress" style in image_8fad32.jpg */}
-                  <div className='mb-6 mt-auto'>
-                    <div className='mb-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-tight'>
-                      <span className='text-slate-400'>
-                        Construction Progress
-                      </span>
-                      <span className='text-[#001f3f]'>
-                        {building.progress || "0"}%
-                      </span>
+                    {/* Footer Info */}
+                    <div className='flex items-center justify-between border-t border-slate-50 pt-4'>
+                      <div className='flex flex-col'>
+                        <span className='text-[10px] font-bold uppercase text-slate-400'>
+                          Contractor
+                        </span>
+                        <span className='text-xs font-bold text-slate-700'>
+                          {building.contractor || "Axon Build Group"}
+                        </span>
+                      </div>
+                      <button className='text-xs font-bold text-[#001f3f] hover:underline'>
+                        View Full Schedule →
+                      </button>
                     </div>
-                    <div className='h-2 w-full rounded-full bg-slate-100'>
-                      <div
-                        className='h-full rounded-full bg-[#001f3f] transition-all duration-1000'
-                        style={{ width: `${building.progress || 0}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Footer Info */}
-                  <div className='flex items-center justify-between border-t border-slate-50 pt-4'>
-                    <div className='flex flex-col'>
-                      <span className='text-[10px] font-bold uppercase text-slate-400'>
-                        Contractor
-                      </span>
-                      <span className='text-xs font-bold text-slate-700'>
-                        {building.contractor || "Axon Build Group"}
-                      </span>
-                    </div>
-                    <button className='text-xs font-bold text-[#001f3f] hover:underline'>
-                      View Full Schedule →
-                    </button>
                   </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </>

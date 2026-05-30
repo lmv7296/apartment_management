@@ -31,7 +31,7 @@ const INITIAL_FORM = {
     security247: false,
   },
   underConstruction: false,
-  phases: [], // Added to support custom phases and steps
+  phases: [],
 };
 
 export default function ProjectDetailView() {

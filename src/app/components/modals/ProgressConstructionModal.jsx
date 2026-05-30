@@ -45,7 +45,7 @@ export default function ProgressConstructionModal({
       console.error("onSubmit prop is missing or not a function");
     }
   };
-  console.log("Rendering ProgressConstructionModal with phase:", currentPhase);
+
   return (
     <BasicModal
       isOpen={isOpen}
