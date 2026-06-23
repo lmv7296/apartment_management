@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { signOut, useSession } from "next-auth/react";
+import { signOut, useSession } from "@/app/providers";
 import LogoMark from "./logo-mark";
 
 function IconMail(props) {
@@ -261,7 +261,7 @@ export default function Header() {
                   type='button'
                   onClick={() => {
                     setIsProfileMenuOpen(false);
-                    signOut({ callbackUrl: "/Login" });
+                    signOut();
                   }}
                   className='mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm font-semibold'
                   style={{ color: "#dc2626", backgroundColor: "#fff5f5" }}>
@@ -428,7 +428,7 @@ export default function Header() {
                       type='button'
                       onClick={() => {
                         setIsProfileMenuOpen(false);
-                        signOut({ callbackUrl: "/" });
+                        signOut();
                       }}
                       className='mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm font-semibold'
                       style={{
@@ -459,7 +459,7 @@ export default function Header() {
             isOpen={isMobileMenuOpen}
             onClose={closeMobileMenu}
             session={session}
-            onSignOut={() => signOut({ callbackUrl: "/" })}
+            onSignOut={() => signOut()}
           />
         ) : null}
       </header>

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import { useRouter } from "next/navigation";
 import KpiRow from "@/app/components/dashboard/KpiRow";
 import QuickActions from "@/app/components/dashboard/QuickActions";

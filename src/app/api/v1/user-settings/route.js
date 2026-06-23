@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-options";
+import { createClient } from "@/utils/supabase/server";
 import { query, withRLS } from "@/lib/db";
 import userPreferences from "@/config/user-preferences.json";
 
@@ -42,8 +41,33 @@ async function ensureUserSettingsColumns() {
 }
 
 async function getAuthenticatedSession() {
-  const session = await getServerSession(authOptions);
-  return session;
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (!user || error) {
+      return null;
+    }
+
+    const { data: profile } = await supabase
+      .from("users")
+      .select("id, company_id, role, unit_id, name")
+      .eq("id", user.id)
+      .single();
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: profile?.name || user.email,
+        role: profile?.role || "tenant",
+        company_id: profile?.company_id || null,
+        unit_id: profile?.unit_id || null,
+      },
+    };
+  } catch (error) {
+    console.error("getAuthenticatedSession server error:", error);
+    return null;
+  }
 }
 
 export async function GET() {

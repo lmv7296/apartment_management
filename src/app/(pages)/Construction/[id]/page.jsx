@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import BasicModal from "@/app/components/basic-modal";

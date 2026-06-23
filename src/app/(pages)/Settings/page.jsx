@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import userPreferences from "@/config/user-preferences.json";
 import { APP_ROUTES } from "@/config/routes";
 

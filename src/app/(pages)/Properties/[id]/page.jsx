@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import { APP_ROUTES } from "@/config/routes";
 import userPreferences from "@/config/user-preferences.json";
 import AddTenantModal from "@/app/components/modals/AddTenantModal";

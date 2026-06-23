@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import { useRouter } from "next/navigation";
 import { APP_ROUTES } from "@/config/routes";
 import { formatMoney } from "@/utils/formatters/formatMoney";

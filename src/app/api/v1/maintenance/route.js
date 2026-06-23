@@ -1,21 +1,32 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-options";
+import { createClient } from "@/utils/supabase/server";
 import { query } from "@/lib/db";
 
 const ALLOWED_PRIORITIES = new Set(["low", "medium", "high"]);
 const ALLOWED_STATUSES = new Set(["open", "in_progress", "closed"]);
 
 async function getAuthenticatedUser() {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id || null;
-  const role = String(session?.user?.role || "tenant").toLowerCase();
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (!user || error) {
+      return null;
+    }
 
-  if (!userId) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    return {
+      userId: user.id,
+      role: String(profile?.role || "tenant").toLowerCase(),
+    };
+  } catch (error) {
+    console.error("getAuthenticatedUser server error:", error);
     return null;
   }
-
-  return { userId, role };
 }
 
 async function getAssignedUnitId(userId) {
