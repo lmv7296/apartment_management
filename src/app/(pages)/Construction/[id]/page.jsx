@@ -2,10 +2,12 @@
 
 import React from "react";
 import { useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import BasicModal from "@/app/components/basic-modal";
 import Progress from "./Progress";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
 const MapView = dynamic(() => import("@/app/components/maps/MapView"), {
   ssr: false,
@@ -35,6 +37,7 @@ const INITIAL_FORM = {
 };
 
 export default function ProjectDetailView() {
+  const { data: session } = useSession();
   const { id } = useParams(); // Get ID from [id] folder
   const [project, setProject] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
@@ -55,9 +58,12 @@ export default function ProjectDetailView() {
       const newTotalCompletion =
         totalPhases > 0 ? Math.round(totalProgress / totalPhases) : 0;
 
-      const res = await fetch(`/api/v1/construction/${projectId}`, {
+      const res = await fetch(`${BACKEND_URL}/api/v1/construction/${projectId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-user-id": session?.user?.id || ""
+        },
         body: JSON.stringify({
           phases: updatedPhases,
           total_completion_pct: newTotalCompletion,
@@ -91,8 +97,11 @@ export default function ProjectDetailView() {
 
     async function loadProject() {
       try {
-        const res = await fetch(`/api/v1/construction/${id}`, {
+        const res = await fetch(`${BACKEND_URL}/api/v1/construction/${id}`, {
           signal: controller.signal,
+          headers: {
+            "x-user-id": session?.user?.id || ""
+          }
         });
         const data = await res.json();
 
@@ -109,10 +118,10 @@ export default function ProjectDetailView() {
       }
     }
 
-    if (id) loadProject();
+    if (id && session?.user?.id) loadProject();
 
     return () => controller.abort();
-  }, [id]);
+  }, [id, session?.user?.id]);
 
   if (loading)
     return (

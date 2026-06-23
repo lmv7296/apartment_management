@@ -10,8 +10,10 @@ import AddTenantModal from "@/app/components/modals/AddTenantModal";
 import RemoveTenantModal from "@/app/components/modals/RemoveTenantModal";
 import AddUnitModal from "@/app/components/modals/AddUnitModal";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
 export default function PropertyDetailsPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
 
@@ -79,11 +81,12 @@ export default function PropertyDetailsPage() {
       if (modalMode === "add") {
         const propertyId = String(params?.id || "");
         const response = await fetch(
-          `/api/v1/Properties/${propertyId}/add-tenant`,
+          `${BACKEND_URL}/api/v1/properties/${propertyId}/add-tenant`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              "x-user-id": session?.user?.id || ""
             },
             body: JSON.stringify({
               unitId: activeUnit?.id,
@@ -123,9 +126,12 @@ export default function PropertyDetailsPage() {
 
         // Reload property data
         const propertyResponse = await fetch(
-          `/api/v1/Properties/${propertyId}`,
+          `${BACKEND_URL}/api/v1/properties/${propertyId}`,
           {
             cache: "no-store",
+            headers: {
+              "x-user-id": session?.user?.id || ""
+            }
           },
         );
         const propertyData = await propertyResponse.json();
@@ -134,11 +140,12 @@ export default function PropertyDetailsPage() {
         // Remove tenant
         const propertyId = String(params?.id || "");
         const response = await fetch(
-          `/api/v1/Properties/${propertyId}/remove-tenant`,
+          `${BACKEND_URL}/api/v1/properties/${propertyId}/remove-tenant`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              "x-user-id": session?.user?.id || ""
             },
             body: JSON.stringify({
               unitId: activeUnit?.id,
@@ -173,9 +180,12 @@ export default function PropertyDetailsPage() {
         closeModal();
         // Reload property data
         const propertyResponse = await fetch(
-          `/api/v1/Properties/${propertyId}`,
+          `${BACKEND_URL}/api/v1/properties/${propertyId}`,
           {
             cache: "no-store",
+            headers: {
+              "x-user-id": session?.user?.id || ""
+            }
           },
         );
         const propertyData = await propertyResponse.json();
@@ -193,10 +203,11 @@ export default function PropertyDetailsPage() {
               ? Math.round(parsedArea * 10.7639)
               : Math.round(parsedArea);
 
-        const response = await fetch(`/api/v1/Properties/${propertyId}/units`, {
+        const response = await fetch(`${BACKEND_URL}/api/v1/properties/${propertyId}/units`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "x-user-id": session?.user?.id || ""
           },
           body: JSON.stringify({
             unitCode: formData.addUnit.unitCode,
@@ -228,9 +239,12 @@ export default function PropertyDetailsPage() {
         closeModal();
         // Reload property data
         const propertyResponse = await fetch(
-          `/api/v1/Properties/${propertyId}`,
+          `${BACKEND_URL}/api/v1/properties/${propertyId}`,
           {
             cache: "no-store",
+            headers: {
+              "x-user-id": session?.user?.id || ""
+            }
           },
         );
         const propertyData = await propertyResponse.json();
@@ -279,8 +293,11 @@ export default function PropertyDetailsPage() {
         setError("");
 
         const propertyId = String(params?.id || "");
-        const response = await fetch(`/api/v1/Properties/${propertyId}`, {
+        const response = await fetch(`${BACKEND_URL}/api/v1/properties/${propertyId}`, {
           cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || ""
+          }
         });
         const data = await response.json();
 
@@ -299,9 +316,11 @@ export default function PropertyDetailsPage() {
       }
     }
 
-    loadUserSettings();
-    loadProperty();
-  }, [params, router, status]);
+    if (status === "authenticated" && session?.user?.id) {
+      loadUserSettings();
+      loadProperty();
+    }
+  }, [params, router, status, session?.user?.id]);
 
   React.useEffect(() => {
     if (!actionMessage) {

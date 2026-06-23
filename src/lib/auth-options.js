@@ -43,51 +43,42 @@ export const authOptions = {
           return null;
         }
 
-        const { rows } = await query(
-          `
-            SELECT u.id, u.company_id, u.name, u.email, u.role, u.unit_id, u.password_hash,
-                   c.name AS company_name
-            FROM users u
-            LEFT JOIN companies c ON c.id = u.company_id
-            WHERE LOWER(u.email) = LOWER($1)
-              AND u.active = TRUE
-            LIMIT 1
-          `,
-          [credentials.email],
-        );
+        try {
+          const backendUrl = process.env.BACKEND_URL || "http://localhost:8080";
+          const res = await fetch(`${backendUrl}/api/v1/auth/login`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              email: credentials.email,
+              password: credentials.password,
+            }),
+          });
 
-        const user = rows[0];
+          if (!res.ok) {
+            return null;
+          }
 
-        if (!user) {
+          const data = await res.json();
+          if (!data?.user) {
+            return null;
+          }
+
+          const { user } = data;
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.profile?.name || user.email,
+            role: user.profile?.role || "tenant",
+            company_id: user.profile?.company_id || null,
+            company_name: null,
+            unit_id: user.profile?.unit_id || null,
+          };
+        } catch (error) {
+          console.error("NextAuth authorize backend error:", error);
           return null;
         }
-
-        const hasPasswordHash = Boolean(user.password_hash);
-        const isValidPassword = hasPasswordHash
-          ? await verifyPassword(user.password_hash, credentials.password)
-          : isValidDemoPassword(credentials.password);
-
-        if (!isValidPassword) {
-          return null;
-        }
-
-        if (!hasPasswordHash) {
-          const newHash = await hashPassword(credentials.password);
-          await query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [
-            newHash,
-            user.id,
-          ]);
-        }
-
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          company_id: user.company_id,
-          company_name: user.company_name || null,
-          unit_id: user.unit_id,
-        };
       },
     }),
   ],

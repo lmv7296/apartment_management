@@ -6,6 +6,8 @@ import { useSession } from "next-auth/react";
 import { APP_ROUTES } from "@/config/routes";
 import NewProperty from "./NewPropertie";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
 export default function PropertiesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -45,8 +47,11 @@ export default function PropertiesPage() {
       try {
         setLoading(true);
         setError("");
-        const response = await fetch("/api/v1/Properties", {
+        const response = await fetch(`${BACKEND_URL}/api/v1/properties`, {
           cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || ""
+          }
         });
         const data = await response.json();
 
@@ -65,8 +70,10 @@ export default function PropertiesPage() {
       }
     }
 
-    loadProperties();
-  }, [status, router]);
+    if (status === "authenticated" && session?.user?.id) {
+      loadProperties();
+    }
+  }, [status, router, session?.user?.id]);
 
   React.useEffect(() => {
     if (status !== "authenticated") {
@@ -132,9 +139,12 @@ export default function PropertiesPage() {
       setIsCreatingProperty(true);
       setCreateError("");
 
-      const response = await fetch("/api/v1/Properties", {
+      const response = await fetch(`${BACKEND_URL}/api/v1/properties`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-user-id": session?.user?.id || ""
+        },
         body: JSON.stringify(payload),
       });
       const data = await response.json();

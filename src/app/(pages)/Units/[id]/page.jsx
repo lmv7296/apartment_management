@@ -8,6 +8,8 @@ import { APP_ROUTES } from "@/config/routes";
 import { formatMoney } from "@/utils/formatters/formatMoney";
 import ExtendLeaseModal from "@/app/components/modals/ExtendLeaseModal";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
 function formatDate(value) {
   if (!value) return "N/A";
   const date = new Date(value);
@@ -72,7 +74,7 @@ function maintenanceTone(status) {
 }
 
 export default function UnitDetailsPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
   const unitId = params?.id;
@@ -124,8 +126,11 @@ export default function UnitDetailsPage() {
         }
 
         const [unitResponse, maintenanceResponse] = await Promise.all([
-          fetch(`/api/v1/units/${unitId}`, {
+          fetch(`${BACKEND_URL}/api/v1/units/${unitId}`, {
             cache: "no-store",
+            headers: {
+              "x-user-id": session?.user?.id || ""
+            }
           }),
           fetch(`/api/v1/maintenance?unit=${unitId}`, {
             cache: "no-store",
@@ -157,17 +162,20 @@ export default function UnitDetailsPage() {
       }
     }
 
-    loadUnit();
-  }, [unitId, router, status]);
+    if (status === "authenticated" && session?.user?.id) {
+      loadUnit();
+    }
+  }, [unitId, router, status, session?.user?.id]);
 
   const handleExtendLease = async (newEndDate) => {
     try {
       setIsExtendingLease(true);
       setError("");
-      const response = await fetch(`/api/v1/units/${unitId}/extend-lease`, {
+      const response = await fetch(`${BACKEND_URL}/api/v1/units/${unitId}/extend-lease`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          "x-user-id": session?.user?.id || ""
         },
         body: JSON.stringify({ endDate: newEndDate }),
       });
@@ -181,8 +189,11 @@ export default function UnitDetailsPage() {
       }
 
       // Reload the unit data
-      const unitResponse = await fetch(`/api/v1/units/${unitId}`, {
+      const unitResponse = await fetch(`${BACKEND_URL}/api/v1/units/${unitId}`, {
         cache: "no-store",
+        headers: {
+          "x-user-id": session?.user?.id || ""
+        }
       });
       if (unitResponse.ok) {
         const updatedUnit = await unitResponse.json();

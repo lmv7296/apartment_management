@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { APP_ROUTES } from "@/config/routes";
-
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 const FILTER_OPTIONS = [
   { value: "unit_info", label: "Unit Info" },
   { value: "tenant_details", label: "Tenant Details" },
@@ -52,7 +52,7 @@ export default function UnitsPage() {
   const [apartments, setApartments] = React.useState([]);
   const [filterBy, setFilterBy] = React.useState("unit_info");
   const [search, setSearch] = React.useState("");
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [error, setError] = React.useState("");
 
@@ -67,7 +67,11 @@ export default function UnitsPage() {
     async function fetchApartments() {
       try {
         setError("");
-        const response = await fetch("/api/v1/units");
+        const response = await fetch(`${BACKEND_URL}/api/v1/units`, {
+          headers: {
+            "x-user-id": session?.user?.id || ""
+          }
+        });
         if (!response.ok) {
           throw new Error("Failed to fetch units");
         }
@@ -78,10 +82,10 @@ export default function UnitsPage() {
         setError(fetchError.message || "Failed to fetch units");
       }
     }
-    if (status === "authenticated") {
+    if (status === "authenticated" && session?.user?.id) {
       fetchApartments();
     }
-  }, [status]);
+  }, [status, session?.user?.id]);
 
   const filtered = React.useMemo(
     () => apartments.filter((a) => matchesFilter(a, filterBy, search)),
