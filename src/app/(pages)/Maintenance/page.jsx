@@ -3,8 +3,12 @@
 import React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useSession } from "@/app/providers";
 
-export default function MaintenancePage() {
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
+function MaintenanceContent() {
+  const { data: session } = useSession();
   const params = useSearchParams();
   const unitId = params.get("unit") || "";
   const [title, setTitle] = React.useState("");
@@ -21,10 +25,11 @@ export default function MaintenancePage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/v1/maintenance", {
+      const response = await fetch(`${BACKEND_URL}/api/v1/maintenance`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-user-id": session?.user?.id || "",
         },
         body: JSON.stringify({
           unitId: unitId || null,
@@ -160,3 +165,13 @@ export default function MaintenancePage() {
     </main>
   );
 }
+
+export default function MaintenancePage() {
+  return (
+    <React.Suspense fallback={<p className='text-sm app-text-muted'>Loading...</p>}>
+      <MaintenanceContent />
+    </React.Suspense>
+  );
+}
+
+export const dynamic = "force-dynamic";

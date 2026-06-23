@@ -132,8 +132,11 @@ export default function UnitDetailsPage() {
               "x-user-id": session?.user?.id || ""
             }
           }),
-          fetch(`/api/v1/maintenance?unit=${unitId}`, {
+          fetch(`${BACKEND_URL}/api/v1/maintenance?unit=${unitId}`, {
             cache: "no-store",
+            headers: {
+              "x-user-id": session?.user?.id || ""
+            }
           }),
         ]);
 

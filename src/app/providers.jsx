@@ -5,6 +5,8 @@ import { createClient } from "@/utils/supabase/client";
 
 const SessionContext = createContext({ data: null, status: "loading" });
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
 export default function Providers({ children }) {
   const [session, setSession] = useState(null);
   const [status, setStatus] = useState("loading");
@@ -23,38 +25,31 @@ export default function Providers({ children }) {
       }
 
       try {
-        // Fetch additional profile data from users table
-        const { data: profile, error } = await supabase
-          .from("users")
-          .select("id, company_id, role, unit_id, name")
-          .eq("id", sbSession.user.id)
-          .single();
+        const response = await fetch(`${BACKEND_URL}/api/v1/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${sbSession.access_token}`,
+          },
+        });
+        if (!response.ok) {
+          throw new Error("Failed to fetch user profile from backend API");
+        }
+        const profilePayload = await response.json();
+        
+        // Map backend response structure { id, email, profile: { id, company_id, role, name, unit_id } }
+        // to frontend session user object
+        const profile = profilePayload.profile || {};
 
         if (!cancelled) {
-          if (profile) {
-            setSession({
-              user: {
-                id: sbSession.user.id,
-                email: sbSession.user.email,
-                name: profile.name || sbSession.user.email,
-                role: profile.role || "tenant",
-                company_id: profile.company_id || null,
-                unit_id: profile.unit_id || null,
-              },
-            });
-          } else {
-            // Fallback if profile row is not found yet
-            setSession({
-              user: {
-                id: sbSession.user.id,
-                email: sbSession.user.email,
-                name: sbSession.user.email,
-                role: "tenant",
-                company_id: null,
-                unit_id: null,
-              },
-            });
-          }
+          setSession({
+            user: {
+              id: profilePayload.id || sbSession.user.id,
+              email: profilePayload.email || sbSession.user.email,
+              name: profile.name || profilePayload.email || sbSession.user.email,
+              role: profile.role || "tenant",
+              company_id: profile.company_id || null,
+              unit_id: profile.unit_id || null,
+            },
+          });
           setStatus("authenticated");
         }
       } catch (err) {

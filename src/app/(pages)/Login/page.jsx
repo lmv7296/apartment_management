@@ -26,20 +26,48 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+      const response = await fetch(`${backendUrl}/api/v1/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    setLoading(false);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        setError(errorData.error || "Invalid email or password");
+        setLoading(false);
+        return;
+      }
 
-    if (signInError) {
-      setError("Invalid email or password");
-      return;
+      const { session } = await response.json();
+      if (!session || !session.access_token || !session.refresh_token) {
+        setError("Failed to retrieve valid session from login server.");
+        setLoading(false);
+        return;
+      }
+
+      const supabase = createClient();
+      const { error: setSessionError } = await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+
+      if (setSessionError) {
+        setError("Failed to establish session on the client: " + setSessionError.message);
+        setLoading(false);
+        return;
+      }
+
+      router.push("/Dashboard");
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("An unexpected error occurred. Please check if the backend is running.");
+      setLoading(false);
     }
-
-    router.push("/Dashboard");
   }
 
   return (

@@ -7,11 +7,12 @@ import userPreferences from "@/config/user-preferences.json";
 import { APP_ROUTES } from "@/config/routes";
 
 const defaults = userPreferences.defaultSettings;
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
 export default function SettingsPage() {
   const [isDark, setIsDark] = React.useState(false);
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
 
   const [currency, setCurrency] = React.useState(defaults.currency);
   const [language, setLanguage] = React.useState(defaults.language);
@@ -52,8 +53,11 @@ export default function SettingsPage() {
       setError("");
 
       try {
-        const response = await fetch("/api/v1/user-settings", {
+        const response = await fetch(`${BACKEND_URL}/api/v1/user-settings`, {
           cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || "",
+          },
         });
 
         if (!response.ok) {
@@ -101,10 +105,11 @@ export default function SettingsPage() {
     }
 
     try {
-      const response = await fetch("/api/v1/user-settings", {
+      const response = await fetch(`${BACKEND_URL}/api/v1/user-settings`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          "x-user-id": session?.user?.id || "",
         },
         body: JSON.stringify({
           currency,

@@ -267,8 +267,11 @@ export default function PropertyDetailsPage() {
 
     async function loadUserSettings() {
       try {
-        const response = await fetch("/api/v1/user-settings", {
+        const response = await fetch(`${BACKEND_URL}/api/v1/user-settings`, {
           cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || "",
+          },
         });
         const data = await response.json();
 

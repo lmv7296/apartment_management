@@ -123,8 +123,11 @@ export default function ManagerDashboard() {
 
     async function loadUserCurrency() {
       try {
-        const response = await fetch("/api/v1/user-settings", {
+        const response = await fetch(`${BACKEND_URL}/api/v1/user-settings`, {
           cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || "",
+          },
         });
 
         if (!response.ok) {
