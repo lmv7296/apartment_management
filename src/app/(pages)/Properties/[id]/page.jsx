@@ -10,7 +10,8 @@ import AddTenantModal from "@/app/components/modals/AddTenantModal";
 import RemoveTenantModal from "@/app/components/modals/RemoveTenantModal";
 import AddUnitModal from "@/app/components/modals/AddUnitModal";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
 export default function PropertyDetailsPage() {
   const { data: session, status } = useSession();
@@ -18,7 +19,9 @@ export default function PropertyDetailsPage() {
   const params = useParams();
 
   const [property, setProperty] = React.useState(null);
+  const [units, setUnits] = React.useState(null);
   const [error, setError] = React.useState("");
+  const [unitsLoading, setUnitsLoading] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
   const [modalMode, setModalMode] = React.useState("");
   const [activeUnit, setActiveUnit] = React.useState(null);
@@ -86,7 +89,7 @@ export default function PropertyDetailsPage() {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-user-id": session?.user?.id || ""
+              "x-user-id": session?.user?.id || "",
             },
             body: JSON.stringify({
               unitId: activeUnit?.id,
@@ -124,18 +127,7 @@ export default function PropertyDetailsPage() {
         }));
         closeModal();
 
-        // Reload property data
-        const propertyResponse = await fetch(
-          `${BACKEND_URL}/api/v1/properties/${propertyId}`,
-          {
-            cache: "no-store",
-            headers: {
-              "x-user-id": session?.user?.id || ""
-            }
-          },
-        );
-        const propertyData = await propertyResponse.json();
-        setProperty(propertyData);
+        await getUnits();
       } else if (modalMode === "remove") {
         // Remove tenant
         const propertyId = String(params?.id || "");
@@ -145,7 +137,7 @@ export default function PropertyDetailsPage() {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-user-id": session?.user?.id || ""
+              "x-user-id": session?.user?.id || "",
             },
             body: JSON.stringify({
               unitId: activeUnit?.id,
@@ -178,18 +170,7 @@ export default function PropertyDetailsPage() {
           },
         }));
         closeModal();
-        // Reload property data
-        const propertyResponse = await fetch(
-          `${BACKEND_URL}/api/v1/properties/${propertyId}`,
-          {
-            cache: "no-store",
-            headers: {
-              "x-user-id": session?.user?.id || ""
-            }
-          },
-        );
-        const propertyData = await propertyResponse.json();
-        setProperty(propertyData);
+        await getUnits();
       } else if (modalMode === "addUnit") {
         // Add unit
         const propertyId = String(params?.id || "");
@@ -203,19 +184,22 @@ export default function PropertyDetailsPage() {
               ? Math.round(parsedArea * 10.7639)
               : Math.round(parsedArea);
 
-        const response = await fetch(`${BACKEND_URL}/api/v1/properties/${propertyId}/units`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-id": session?.user?.id || ""
+        const response = await fetch(
+          `${BACKEND_URL}/api/v1/properties/${propertyId}/units`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-user-id": session?.user?.id || "",
+            },
+            body: JSON.stringify({
+              unitCode: formData.addUnit.unitCode,
+              bedrooms: parseInt(formData.addUnit.bedrooms) || 0,
+              bathrooms: parseInt(formData.addUnit.bathrooms) || 1,
+              squareFeet: normalizedSquareFeet,
+            }),
           },
-          body: JSON.stringify({
-            unitCode: formData.addUnit.unitCode,
-            bedrooms: parseInt(formData.addUnit.bedrooms) || 0,
-            bathrooms: parseInt(formData.addUnit.bathrooms) || 1,
-            squareFeet: normalizedSquareFeet,
-          }),
-        });
+        );
 
         const data = await response.json();
 
@@ -237,92 +221,109 @@ export default function PropertyDetailsPage() {
           },
         }));
         closeModal();
-        // Reload property data
-        const propertyResponse = await fetch(
-          `${BACKEND_URL}/api/v1/properties/${propertyId}`,
-          {
-            cache: "no-store",
-            headers: {
-              "x-user-id": session?.user?.id || ""
-            }
-          },
-        );
-        const propertyData = await propertyResponse.json();
-        setProperty(propertyData);
+        await getUnits();
       }
     } catch (err) {
       setActionMessage(`Error: ${err.message}`);
     }
   }
 
-  React.useEffect(() => {
-    if (status === "unauthenticated") {
-      router.replace(APP_ROUTES.login);
-      return;
-    }
+  async function getUnits() {
+    setUnitsLoading(true);
+    const allUnits = await fetch(
+      `${BACKEND_URL}/api/v1/properties/${params?.id}/units`,
+      {
+        cache: "no-store",
+        headers: {
+          "x-user-id": session?.user?.id || "",
+        },
+      },
+    );
 
-    if (status !== "authenticated") {
-      return;
+    const data = await allUnits.json();
+    if (!allUnits.ok) {
+      throw new Error(data?.error || "Failed to load units");
     }
+    setUnits(data);
+    setUnitsLoading(false);
+    return data;
+  }
+  async function loadUserSettings() {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/v1/user-settings`, {
+        cache: "no-store",
+        headers: {
+          "x-user-id": session?.user?.id || "",
+        },
+      });
+      const data = await response.json();
 
-    async function loadUserSettings() {
-      try {
-        const response = await fetch(`${BACKEND_URL}/api/v1/user-settings`, {
+      if (response.ok && data.currency) {
+        setUserCurrency(data.currency);
+        setFormData((prev) => ({
+          ...prev,
+          add: {
+            ...prev.add,
+            currency: data.currency,
+          },
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to load user settings:", err);
+    }
+  }
+
+  async function loadProperty() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const propertyId = String(params?.id || "");
+      const response = await fetch(
+        `${BACKEND_URL}/api/v1/properties/${propertyId}`,
+        {
           cache: "no-store",
           headers: {
             "x-user-id": session?.user?.id || "",
           },
-        });
-        const data = await response.json();
+        },
+      );
+      const data = await response.json();
 
-        if (response.ok && data.currency) {
-          setUserCurrency(data.currency);
-          setFormData((prev) => ({
-            ...prev,
-            add: {
-              ...prev.add,
-              currency: data.currency,
-            },
-          }));
-        }
-      } catch (err) {
-        console.error("Failed to load user settings:", err);
+      if (!response.ok) {
+        throw new Error(
+          data?.detail || data?.error || "Failed to load property",
+        );
       }
+
+      setProperty(data);
+    } catch (loadError) {
+      setProperty(null);
+      setError(loadError.message || "Failed to load property");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  React.useEffect(() => {
+    if (status === "authenticated") {
+      return;
     }
 
-    async function loadProperty() {
+    if (status !== "authenticated") {
+      router.push(APP_ROUTES.login);
+      return;
+    }
+
+    (async () => {
       try {
-        setLoading(true);
-        setError("");
-
-        const propertyId = String(params?.id || "");
-        const response = await fetch(`${BACKEND_URL}/api/v1/properties/${propertyId}`, {
-          cache: "no-store",
-          headers: {
-            "x-user-id": session?.user?.id || ""
-          }
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data?.detail || data?.error || "Failed to load property",
-          );
-        }
-
-        setProperty(data);
-      } catch (loadError) {
-        setProperty(null);
-        setError(loadError.message || "Failed to load property");
-      } finally {
-        setLoading(false);
+        await loadUserSettings();
+        await loadProperty();
+        await getUnits();
+      } catch (err) {
+        setError(err.message || "An error occurred while loading data");
       }
-    }
-
-    if (status === "authenticated" && session?.user?.id) {
-      loadUserSettings();
-      loadProperty();
-    }
+    })();
   }, [params, router, status, session?.user?.id]);
 
   React.useEffect(() => {
@@ -337,7 +338,7 @@ export default function PropertyDetailsPage() {
     return () => clearTimeout(timeoutId);
   }, [actionMessage]);
 
-  // ── View state ─────────────────────────────────────────────────────
+  const allUnits = units || [];
   const [unitFilter, setUnitFilter] = React.useState("all");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -346,7 +347,6 @@ export default function PropertyDetailsPage() {
     setCurrentPage(1);
   }, [unitFilter, searchQuery]);
 
-  // ── Helpers ────────────────────────────────────────────────────────
   const ITEMS_PER_PAGE = 10;
 
   function getUnitStatus(unit) {
@@ -371,8 +371,6 @@ export default function PropertyDetailsPage() {
       : name.slice(0, 2).toUpperCase();
   }
 
-  // ── Computed ───────────────────────────────────────────────────────
-  const allUnits = property?.units || [];
   const occupiedCount = allUnits.filter(
     (u) => getUnitStatus(u) === "occupied",
   ).length;
@@ -407,7 +405,7 @@ export default function PropertyDetailsPage() {
     (safePage - 1) * ITEMS_PER_PAGE,
     safePage * ITEMS_PER_PAGE,
   );
-
+  console.log(units);
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-6'>
       {/* ── Loading ──────────────────────────────────────────────── */}
@@ -424,7 +422,6 @@ export default function PropertyDetailsPage() {
         </div>
       ) : null}
 
-      {/* ── Main content ─────────────────────────────────────────── */}
       {!loading && !error && property ? (
         <>
           {/* Breadcrumb */}
@@ -591,9 +588,15 @@ export default function PropertyDetailsPage() {
             </div>
 
             {/* Table */}
-            {paginatedUnits.length === 0 ? (
+            {unitsLoading ? (
               <div className='py-12 text-center text-sm text-slate-400'>
-                No units match your search or filter.
+                Loading units...
+              </div>
+            ) : paginatedUnits.length === 0 ? (
+              <div className='py-12 text-center text-sm text-slate-400'>
+                {searchQuery || unitFilter !== "all"
+                  ? "No units match your search or filter."
+                  : "No units have been added to this property yet."}
               </div>
             ) : (
               <div className='overflow-x-auto'>
