@@ -55,6 +55,48 @@ export default function PropertyDetailsPage() {
     },
   });
 
+  function normalizeUnit(unit) {
+    if (!unit || typeof unit !== "object") return null;
+
+    return {
+      ...unit,
+      id: unit.id,
+      unitCode: unit.unitCode || unit.unit_code || unit.code || unit.unitCode || "Unit",
+      bedrooms: unit.bedrooms ?? unit.bedroom_count ?? 0,
+      bathrooms: unit.bathrooms ?? unit.bathroom_count ?? 1,
+      squareFeet: unit.squareFeet ?? unit.square_feet ?? unit.squareft ?? null,
+      tenantName:
+        unit.tenantName ||
+        unit.tenant_name ||
+        unit.assignedTenantName ||
+        unit.assigned_tenant_name ||
+        null,
+      leaveDate: unit.leaveDate || unit.leave_date || null,
+      assignedTenant: unit.assignedTenant || unit.assigned_tenant || null,
+    };
+  }
+
+  function normalizeUnits(payload) {
+    if (Array.isArray(payload)) {
+      return payload.map(normalizeUnit).filter(Boolean);
+    }
+
+    if (payload && typeof payload === "object") {
+      if (payload.id && (payload.unit_code || payload.unitCode || payload.code)) {
+        return [normalizeUnit(payload)].filter(Boolean);
+      }
+
+      const directUnits = Array.isArray(payload.units)
+        ? payload.units
+        : Array.isArray(payload.data)
+          ? payload.data
+          : [];
+      return directUnits.map(normalizeUnit).filter(Boolean);
+    }
+
+    return [];
+  }
+
   function openModal(mode, unit) {
     setModalMode(mode);
     setActiveUnit(unit);
@@ -228,8 +270,7 @@ export default function PropertyDetailsPage() {
     }
   }
 
-  async function getUnits() {
-    setUnitsLoading(true);
+  async function getUnits(propertyId = String(params?.id || "")) {
     const allUnits = await fetch(
       `${BACKEND_URL}/api/v1/properties/${params?.id}/units`,
       {
@@ -244,9 +285,10 @@ export default function PropertyDetailsPage() {
     if (!allUnits.ok) {
       throw new Error(data?.error || "Failed to load units");
     }
-    setUnits(data);
-    setUnitsLoading(false);
-    return data;
+    console.log(data)
+    const normalizedUnits = normalizeUnits(data);
+    setUnits(normalizedUnits);
+    return normalizedUnits;
   }
   async function loadUserSettings() {
     try {
@@ -273,58 +315,79 @@ export default function PropertyDetailsPage() {
     }
   }
 
-  async function loadProperty() {
-    try {
-      setLoading(true);
-      setError("");
+  async function loadProperty(propertyId = String(params?.id || "")) {
+    const response = await fetch(`${BACKEND_URL}/api/v1/properties/${propertyId}`, {
+      cache: "no-store",
+      headers: {
+        "x-user-id": session?.user?.id || "",
+      },
+    });
+    const data = await response.json();
 
-      const propertyId = String(params?.id || "");
-      const response = await fetch(
-        `${BACKEND_URL}/api/v1/properties/${propertyId}`,
-        {
-          cache: "no-store",
-          headers: {
-            "x-user-id": session?.user?.id || "",
-          },
-        },
-      );
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail || data?.error || "Failed to load property",
-        );
-      }
-
-      setProperty(data);
-    } catch (loadError) {
-      setProperty(null);
-      setError(loadError.message || "Failed to load property");
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      throw new Error(data?.detail || data?.error || "Failed to load property");
     }
+
+    const embeddedUnits = normalizeUnits(data?.units || data);
+    setProperty(data);
+    if (embeddedUnits.length > 0) {
+      setUnits(embeddedUnits);
+    } else {
+      setUnits([]);
+    }
+
+    return data;
   }
 
   React.useEffect(() => {
-    if (status === "authenticated") {
+    if (status === "loading") {
       return;
     }
 
-    if (status !== "authenticated") {
-      router.push(APP_ROUTES.login);
+    if (status === "unauthenticated") {
+      router.replace(APP_ROUTES.login);
       return;
     }
 
-    (async () => {
+    if (!session?.user?.id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadPageData() {
       try {
+        setLoading(true);
+        setError("");
+        setUnitsLoading(true);
+
         await loadUserSettings();
-        await loadProperty();
-        await getUnits();
+        const propertyData = await loadProperty(String(params?.id || ""));
+        const hasEmbeddedUnits = Array.isArray(propertyData?.units) && propertyData.units.length > 0;
+
+        if (!cancelled && !hasEmbeddedUnits) {
+          await getUnits(String(params?.id || ""));
+        }
       } catch (err) {
-        setError(err.message || "An error occurred while loading data");
+        if (!cancelled) {
+          setProperty(null);
+          setUnits([]);
+          setError(err.message || "An error occurred while loading data");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setUnitsLoading(false);
+        }
       }
-    })();
-  }, [params, router, status, session?.user?.id]);
+    }
+
+    loadPageData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [params?.id, router, session?.user?.id, status]);
 
   React.useEffect(() => {
     if (!actionMessage) {
@@ -405,7 +468,6 @@ export default function PropertyDetailsPage() {
     (safePage - 1) * ITEMS_PER_PAGE,
     safePage * ITEMS_PER_PAGE,
   );
-  console.log(units);
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-6'>
       {/* ── Loading ──────────────────────────────────────────────── */}

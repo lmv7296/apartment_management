@@ -24,18 +24,6 @@ export default function PropertiesPage() {
 
   const ITEMS_PER_PAGE = 10;
 
-  const headerStats = React.useMemo(() => {
-    const propertyCount = properties.length;
-    const unitCount = properties.reduce(
-      (sum, property) => sum + Number(property.unitCount || 0),
-      0,
-    );
-    const tenantCount = properties.reduce(
-      (sum, property) => sum + Number(property.tenantCount || 0),
-      0,
-    );
-    return { propertyCount, unitCount, tenantCount };
-  }, [properties]);
 
   React.useEffect(() => {
     if (status === "unauthenticated") {
@@ -82,7 +70,7 @@ export default function PropertiesPage() {
 
     let cancelled = false;
 
-    async function loadUnitPreferences() {
+    async function loadUserSettings() {
       try {
         const response = await fetch(`${BACKEND_URL}/api/v1/user-settings`, {
           cache: "no-store",
@@ -105,7 +93,7 @@ export default function PropertiesPage() {
       }
     }
 
-    loadUnitPreferences();
+    loadUserSettings();
 
     return () => {
       cancelled = true;
@@ -137,6 +125,20 @@ export default function PropertiesPage() {
     safePage * ITEMS_PER_PAGE,
   );
 
+  const headerStats = React.useMemo(() => {
+    const propertyCount = properties.length;
+    const unitCount = properties.reduce((sum, property) => {
+      const units = Array.isArray(property.units) ? property.units : [];
+      return sum + units.length;
+    }, 0);
+    const tenantCount = properties.reduce((sum, property) => {
+      const units = Array.isArray(property.units) ? property.units : [];
+      return (
+        sum + units.filter((unit) => Boolean(unit?.assigned_tenant)).length
+      );
+    }, 0);
+    return { propertyCount, unitCount, tenantCount };
+  }, [properties]);
   async function handleCreateProperty(payload) {
     try {
       setIsCreatingProperty(true);
@@ -335,7 +337,16 @@ export default function PropertiesPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedProps.map((property) => (
+                {paginatedProps.map((property) => {
+                  const propertyUnits = Array.isArray(property.units)
+                    ? property.units
+                    : [];
+                  const unitCount = propertyUnits.length;
+                  const tenantCount = propertyUnits.filter((unit) =>
+                    Boolean(unit?.assigned_tenant),
+                  ).length;
+
+                  return (
                   <tr
                     key={property.id}
                     className='border-b border-slate-100 last:border-0 hover:bg-slate-50'>
@@ -390,7 +401,7 @@ export default function PropertiesPage() {
                     {/* Units */}
                     <td className='px-4 py-4'>
                       <p className='font-semibold text-slate-900'>
-                        {property.unitCount ?? 0}
+                        {unitCount}
                       </p>
                       <p className='text-xs text-slate-400'>total units</p>
                     </td>
@@ -398,7 +409,7 @@ export default function PropertiesPage() {
                     {/* Tenants */}
                     <td className='px-4 py-4'>
                       <p className='font-semibold text-slate-900'>
-                        {property.tenantCount ?? 0}
+                        {tenantCount}
                       </p>
                       <p className='text-xs text-slate-400'>active leases</p>
                     </td>
@@ -412,7 +423,8 @@ export default function PropertiesPage() {
                       </Link>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -7,6 +7,12 @@ import { useState, useEffect } from "react";
 import { APP_ROUTES } from "@/config/routes";
 import { createClient } from "@/utils/supabase/client";
 
+const normalizeBackendUrl = (value = "") => {
+  const trimmed = value.trim();
+  if (!trimmed) return "http://localhost:8080";
+  return trimmed.replace(/\/+$/, "");
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const { status } = useSession();
@@ -27,7 +33,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+      const backendUrl = normalizeBackendUrl(process.env.NEXT_PUBLIC_BACKEND_URL);
       const response = await fetch(`${backendUrl}/api/v1/auth/login`, {
         method: "POST",
         headers: {

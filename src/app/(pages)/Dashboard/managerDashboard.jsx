@@ -8,7 +8,7 @@ import { APP_ROUTES } from "@/config/routes";
 import { formatMoney } from "@/utils/formatters/formatMoney";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
-// ─── Activity level dot colour ────────────────────────────────────────────────
+
 const LEVEL_DOT = {
   high: "#22c55e",
   medium: "#6366f1",
