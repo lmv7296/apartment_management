@@ -7,6 +7,7 @@ import { useSession } from "@/app/providers";
 import { APP_ROUTES } from "@/config/routes";
 import { formatMoney } from "@/utils/formatters/formatMoney";
 import ExtendLeaseModal from "@/app/components/modals/ExtendLeaseModal";
+import AssignTenantModal from "@/app/components/modals/AssignTenantModal";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
@@ -100,10 +101,15 @@ export default function UnitDetailsPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
   const [extendLeaseModalOpen, setExtendLeaseModalOpen] = React.useState(false);
+  const [assignTenantModalOpen, setAssignTenantModalOpen] = React.useState(false);
   const [isExtendingLease, setIsExtendingLease] = React.useState(false);
 
   const handleCloseExtendLeaseModal = React.useCallback(() => {
     setExtendLeaseModalOpen(false);
+  }, []);
+
+  const handleCloseAssignTenantModal = React.useCallback(() => {
+    setAssignTenantModalOpen(false);
   }, []);
 
   React.useEffect(() => {
@@ -302,12 +308,12 @@ export default function UnitDetailsPage() {
               <div className='flex flex-wrap gap-2'>
                 <button
                   type='button'
-                  className='rounded-xl border px-4 py-2 text-sm font-bold'
+                  onClick={() => setAssignTenantModalOpen(true)}
+                  className='rounded-xl px-4 py-2 text-sm font-bold text-white'
                   style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
+                    background: "linear-gradient(90deg, #16a34a, #059669)",
                   }}>
-                  Edit Details
+                  Assign Tenant
                 </button>
                 <button
                   type='button'
@@ -582,17 +588,40 @@ export default function UnitDetailsPage() {
       ) : null}
 
       {unit && (
-        <ExtendLeaseModal
-          isSubmitting={isExtendingLease}
-          isOpen={extendLeaseModalOpen}
-          onClose={handleCloseExtendLeaseModal}
-          currentEndDate={
-            unit?.leaseEndDate
-              ? new Date(unit.leaseEndDate).toISOString().split("T")[0]
-              : ""
-          }
-          onSubmit={handleExtendLease}
-        />
+        <>
+          <ExtendLeaseModal
+            isSubmitting={isExtendingLease}
+            isOpen={extendLeaseModalOpen}
+            onClose={handleCloseExtendLeaseModal}
+            currentEndDate={
+              unit?.leaseEndDate
+                ? new Date(unit.leaseEndDate).toISOString().split("T")[0]
+                : ""
+            }
+            onSubmit={handleExtendLease}
+          />
+          <AssignTenantModal
+            isOpen={assignTenantModalOpen}
+            onClose={handleCloseAssignTenantModal}
+            unitId={unitId}
+            unitCode={unit.unitCode}
+            session={session}
+            onSuccess={() => {
+              // Refresh unit data after successful tenant assignment
+              if (session?.user?.id && unitId) {
+                fetch(`${BACKEND_URL}/api/v1/units/${unitId}`, {
+                  cache: "no-store",
+                  headers: {
+                    "x-user-id": session.user.id,
+                  },
+                })
+                  .then((res) => res.json())
+                  .then((data) => setUnit(data))
+                  .catch(console.error);
+              }
+            }}
+          />
+        </>
       )}
     </main>
   );

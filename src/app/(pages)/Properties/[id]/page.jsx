@@ -18,9 +18,10 @@ export default function PropertyDetailsPage() {
   const router = useRouter();
   const params = useParams();
 
-  const [property, setProperty] = React.useState(null);
+  const settingsLoadedRef = React.useRef(false);
   const [units, setUnits] = React.useState(null);
   const [error, setError] = React.useState("");
+  const [property, setProperty] = React.useState([]);
   const [unitsLoading, setUnitsLoading] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
   const [modalMode, setModalMode] = React.useState("");
@@ -35,6 +36,7 @@ export default function PropertyDetailsPage() {
       email: "",
       phone: "",
       startDate: "",
+      endDate: "",
       monthlyRent: "",
       currency: userPreferences.defaultSettings.currency,
       notes: "",
@@ -61,7 +63,8 @@ export default function PropertyDetailsPage() {
     return {
       ...unit,
       id: unit.id,
-      unitCode: unit.unitCode || unit.unit_code || unit.code || unit.unitCode || "Unit",
+      unitCode:
+        unit.unitCode || unit.unit_code || unit.code || unit.unitCode || "Unit",
       bedrooms: unit.bedrooms ?? unit.bedroom_count ?? 0,
       bathrooms: unit.bathrooms ?? unit.bathroom_count ?? 1,
       squareFeet: unit.squareFeet ?? unit.square_feet ?? unit.squareft ?? null,
@@ -82,7 +85,10 @@ export default function PropertyDetailsPage() {
     }
 
     if (payload && typeof payload === "object") {
-      if (payload.id && (payload.unit_code || payload.unitCode || payload.code)) {
+      if (
+        payload.id &&
+        (payload.unit_code || payload.unitCode || payload.code)
+      ) {
         return [normalizeUnit(payload)].filter(Boolean);
       }
 
@@ -95,6 +101,31 @@ export default function PropertyDetailsPage() {
     }
 
     return [];
+  }
+
+  async function getUnits(propertyId = String(params?.id || "")) {
+    try {
+      const resp = await fetch(`${BACKEND_URL}/api/v1/units/${propertyId}`, {
+        cache: "no-store",
+        headers: {
+          "x-user-id": session?.user?.id || "",
+        },
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data?.error || "Failed to load units");
+      }
+
+      const normalizedUnits = normalizeUnits(data);
+      setUnits(normalizedUnits);
+      return normalizedUnits;
+    } catch (err) {
+      console.error("getUnits error:", err);
+      setError(err.message || "Failed to get units");
+      setUnits([]);
+      return [];
+    }
   }
 
   function openModal(mode, unit) {
@@ -139,6 +170,7 @@ export default function PropertyDetailsPage() {
               email: formData.add.email,
               phone: formData.add.phone,
               startDate: formData.add.startDate,
+              endDate: formData.add.endDate,
               monthlyRent: formData.add.monthlyRent,
               notes: formData.add.notes,
               currency: formData.add.currency,
@@ -162,6 +194,7 @@ export default function PropertyDetailsPage() {
             email: "",
             phone: "",
             startDate: "",
+            endDate: "",
             monthlyRent: "",
             currency: userCurrency,
             notes: "",
@@ -270,74 +303,61 @@ export default function PropertyDetailsPage() {
     }
   }
 
-  async function getUnits(propertyId = String(params?.id || "")) {
-    const allUnits = await fetch(
-      `${BACKEND_URL}/api/v1/properties/${params?.id}/units`,
-      {
-        cache: "no-store",
-        headers: {
-          "x-user-id": session?.user?.id || "",
-        },
-      },
+  React.useEffect(() => {
+    if (status !== "authenticated" || !session?.user?.id) {
+      return;
+    }
+    const propertyId = String(params?.id || "");
+    const cachedData = sessionStorage.getItem("properties");
+
+    setProperty(
+      cachedData
+        ? JSON.parse(cachedData).find((p) => p.id === propertyId)
+        : null,
     );
+    let cancelled = false;
 
-    const data = await allUnits.json();
-    if (!allUnits.ok) {
-      throw new Error(data?.error || "Failed to load units");
-    }
-    console.log(data)
-    const normalizedUnits = normalizeUnits(data);
-    setUnits(normalizedUnits);
-    return normalizedUnits;
-  }
-  async function loadUserSettings() {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/v1/user-settings`, {
-        cache: "no-store",
-        headers: {
-          "x-user-id": session?.user?.id || "",
-        },
-      });
-      const data = await response.json();
-
-      if (response.ok && data.currency) {
-        setUserCurrency(data.currency);
-        setFormData((prev) => ({
-          ...prev,
-          add: {
-            ...prev.add,
-            currency: data.currency,
+    async function loadUserSettingsOnce() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/v1/user-settings`, {
+          cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || "",
           },
-        }));
+        });
+
+        if (!response.ok || cancelled) {
+          return;
+        }
+
+        const data = await response.json();
+        if (cancelled) {
+          return;
+        }
+
+        if (data?.currency) {
+          setUserCurrency(data.currency);
+          setFormData((prev) => ({
+            ...prev,
+            add: {
+              ...prev.add,
+              currency: data.currency,
+            },
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to load user settings:", err);
+      } finally {
+        settingsLoadedRef.current = true;
       }
-    } catch (err) {
-      console.error("Failed to load user settings:", err);
-    }
-  }
-
-  async function loadProperty(propertyId = String(params?.id || "")) {
-    const response = await fetch(`${BACKEND_URL}/api/v1/properties/${propertyId}`, {
-      cache: "no-store",
-      headers: {
-        "x-user-id": session?.user?.id || "",
-      },
-    });
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data?.detail || data?.error || "Failed to load property");
     }
 
-    const embeddedUnits = normalizeUnits(data?.units || data);
-    setProperty(data);
-    if (embeddedUnits.length > 0) {
-      setUnits(embeddedUnits);
-    } else {
-      setUnits([]);
-    }
+    loadUserSettingsOnce();
 
-    return data;
-  }
+    return () => {
+      cancelled = true;
+    };
+  }, [status, session?.user?.id]);
 
   React.useEffect(() => {
     if (status === "loading") {
@@ -357,22 +377,37 @@ export default function PropertyDetailsPage() {
 
     async function loadPageData() {
       try {
-        setLoading(true);
         setError("");
+        setLoading(true);
         setUnitsLoading(true);
 
-        await loadUserSettings();
-        const propertyData = await loadProperty(String(params?.id || ""));
-        const hasEmbeddedUnits = Array.isArray(propertyData?.units) && propertyData.units.length > 0;
+        const propertyId = String(params?.id || "");
+        const unitsResponse = await fetch(
+          `${BACKEND_URL}/api/v1/units/${propertyId}`,
+          {
+            cache: "no-store",
+            headers: {
+              "x-user-id": session?.user?.id || "",
+            },
+          },
+        );
 
-        if (!cancelled && !hasEmbeddedUnits) {
-          await getUnits(String(params?.id || ""));
+        const unitsData = await unitsResponse.json();
+
+        if (!unitsResponse.ok) {
+          throw new Error(
+            unitsData?.detail || unitsData?.error || "Failed to load units",
+          );
         }
-      } catch (err) {
+
         if (!cancelled) {
-          setProperty(null);
+          setUnits(normalizeUnits(unitsData));
+        }
+      } catch (fetchError) {
+        console.error("Error loading units:", fetchError);
+        if (!cancelled) {
+          setError(fetchError.message || "Failed to load property data");
           setUnits([]);
-          setError(err.message || "An error occurred while loading data");
         }
       } finally {
         if (!cancelled) {
@@ -410,22 +445,28 @@ export default function PropertyDetailsPage() {
     setCurrentPage(1);
   }, [unitFilter, searchQuery]);
 
-  const ITEMS_PER_PAGE = 10;
-
   function getUnitStatus(unit) {
-    if (!unit.tenantName) return "vacant";
+    if (!unit.name) return "vacant";
     if (unit.leaveDate) return "maintenance";
     return "occupied";
   }
 
-  const AVATAR_COLORS = ["#1d4ed8", "#7c3aed", "#059669", "#b45309", "#dc2626"];
   function getAvatarColor(name) {
+    const AVATAR_COLORS = [
+      "#1d4ed8",
+      "#7c3aed",
+      "#059669",
+      "#b45309",
+      "#dc2626",
+    ];
     if (!name) return "#94a3b8";
     let hash = 0;
     for (let i = 0; i < name.length; i++)
       hash = (hash << 5) - hash + name.charCodeAt(i);
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   }
+
+  //figure out what it dus
   function getInitials(name) {
     if (!name) return "?";
     const parts = name.trim().split(/\s+/);
@@ -455,10 +496,11 @@ export default function PropertyDetailsPage() {
     const matchesSearch =
       !q ||
       (unit.unitCode || "").toLowerCase().includes(q) ||
-      (unit.tenantName || "").toLowerCase().includes(q);
+      (unit.name || "").toLowerCase().includes(q);
     return matchesFilter && matchesSearch;
   });
 
+  const ITEMS_PER_PAGE = 10;
   const totalPages = Math.max(
     1,
     Math.ceil(filteredUnits.length / ITEMS_PER_PAGE),
@@ -484,7 +526,7 @@ export default function PropertyDetailsPage() {
         </div>
       ) : null}
 
-      {!loading && !error && property ? (
+      {!loading && !error ? (
         <>
           {/* Breadcrumb */}
           <nav className='mb-4 flex items-center gap-1.5 text-xs font-medium text-slate-400'>
@@ -495,7 +537,7 @@ export default function PropertyDetailsPage() {
             </Link>
             <span>/</span>
             <span className='font-semibold text-slate-700'>
-              {property.name}
+              Property {property?.name}
             </span>
           </nav>
 
@@ -503,21 +545,8 @@ export default function PropertyDetailsPage() {
           <div className='mb-6 flex flex-wrap items-start justify-between gap-4'>
             <div>
               <h1 className='text-3xl font-black text-slate-900'>
-                {property.name}
+                Property {property?.name}
               </h1>
-              <p className='mt-1 flex items-center gap-1.5 text-sm text-slate-500'>
-                <svg
-                  className='h-4 w-4 shrink-0'
-                  viewBox='0 0 20 20'
-                  fill='currentColor'>
-                  <path
-                    fillRule='evenodd'
-                    d='M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z'
-                    clipRule='evenodd'
-                  />
-                </svg>
-                {property.address}, {property.city}, {property.state}
-              </p>
             </div>
             <div className='flex items-center gap-3'>
               <button
@@ -619,7 +648,7 @@ export default function PropertyDetailsPage() {
                   type='text'
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder='Search by unit, tenant or status...'
+                  placeholder='Search by unit, tenant'
                   className='w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-200'
                 />
               </div>
@@ -683,8 +712,8 @@ export default function PropertyDetailsPage() {
                   <tbody>
                     {paginatedUnits.map((unit) => {
                       const status = getUnitStatus(unit);
-                      const initials = getInitials(unit.tenantName);
-                      const avatarColor = getAvatarColor(unit.tenantName);
+                      const initials = getInitials(unit.name);
+                      const avatarColor = getAvatarColor(unit.name);
                       return (
                         <tr
                           key={unit.id}
@@ -715,7 +744,7 @@ export default function PropertyDetailsPage() {
 
                           {/* Tenant Details */}
                           <td className='px-4 py-4'>
-                            {unit.tenantName ? (
+                            {unit.name ? (
                               <div className='flex items-center gap-2.5'>
                                 <div
                                   className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white'
@@ -724,7 +753,7 @@ export default function PropertyDetailsPage() {
                                 </div>
                                 <div>
                                   <p className='font-semibold text-slate-800'>
-                                    {unit.tenantName}
+                                    {unit.name}
                                   </p>
                                   <p className='text-xs text-slate-400'>
                                     Primary Tenant
@@ -789,7 +818,7 @@ export default function PropertyDetailsPage() {
                           {/* Actions */}
                           <td className='px-4 py-4'>
                             <div className='flex flex-wrap items-center gap-2'>
-                              {unit.tenantName ? (
+                              {unit.name ? (
                                 unit.leaveDate ? (
                                   <button
                                     type='button'
