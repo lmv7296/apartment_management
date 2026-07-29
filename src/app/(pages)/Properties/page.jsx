@@ -81,6 +81,7 @@ export default function PropertiesPage() {
         if (!response.ok) return;
 
         const payload = await response.json();
+        sessionStorage.setItem("userSettings", JSON.stringify(payload));
         if (!cancelled) {
           setPreferredUnitPrefix(String(payload?.unitPrefix ?? "Unit"));
           setPreferredUnitCount(Number(payload?.unitCount ?? 0) || 0);

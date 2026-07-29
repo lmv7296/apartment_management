@@ -19,14 +19,14 @@ export default function PropertyDetailsPage() {
   const params = useParams();
 
   const settingsLoadedRef = React.useRef(false);
-  const [units, setUnits] = React.useState(null);
+  const [property, setProperty] = React.useState(null);
+  const [units, setUnits] = React.useState([]);
   const [error, setError] = React.useState("");
-  const [property, setProperty] = React.useState([]);
-  const [unitsLoading, setUnitsLoading] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
   const [modalMode, setModalMode] = React.useState("");
   const [activeUnit, setActiveUnit] = React.useState(null);
   const [actionMessage, setActionMessage] = React.useState("");
+
   const [userCurrency, setUserCurrency] = React.useState(
     userPreferences.defaultSettings.currency,
   );
@@ -56,77 +56,6 @@ export default function PropertyDetailsPage() {
       areaUnit: "sqft",
     },
   });
-
-  function normalizeUnit(unit) {
-    if (!unit || typeof unit !== "object") return null;
-
-    return {
-      ...unit,
-      id: unit.id,
-      unitCode:
-        unit.unitCode || unit.unit_code || unit.code || unit.unitCode || "Unit",
-      bedrooms: unit.bedrooms ?? unit.bedroom_count ?? 0,
-      bathrooms: unit.bathrooms ?? unit.bathroom_count ?? 1,
-      squareFeet: unit.squareFeet ?? unit.square_feet ?? unit.squareft ?? null,
-      tenantName:
-        unit.tenantName ||
-        unit.tenant_name ||
-        unit.assignedTenantName ||
-        unit.assigned_tenant_name ||
-        null,
-      leaveDate: unit.leaveDate || unit.leave_date || null,
-      assignedTenant: unit.assignedTenant || unit.assigned_tenant || null,
-    };
-  }
-
-  function normalizeUnits(payload) {
-    if (Array.isArray(payload)) {
-      return payload.map(normalizeUnit).filter(Boolean);
-    }
-
-    if (payload && typeof payload === "object") {
-      if (
-        payload.id &&
-        (payload.unit_code || payload.unitCode || payload.code)
-      ) {
-        return [normalizeUnit(payload)].filter(Boolean);
-      }
-
-      const directUnits = Array.isArray(payload.units)
-        ? payload.units
-        : Array.isArray(payload.data)
-          ? payload.data
-          : [];
-      return directUnits.map(normalizeUnit).filter(Boolean);
-    }
-
-    return [];
-  }
-
-  async function getUnits(propertyId = String(params?.id || "")) {
-    try {
-      const resp = await fetch(`${BACKEND_URL}/api/v1/units/${propertyId}`, {
-        cache: "no-store",
-        headers: {
-          "x-user-id": session?.user?.id || "",
-        },
-      });
-
-      const data = await resp.json();
-      if (!resp.ok) {
-        throw new Error(data?.error || "Failed to load units");
-      }
-
-      const normalizedUnits = normalizeUnits(data);
-      setUnits(normalizedUnits);
-      return normalizedUnits;
-    } catch (err) {
-      console.error("getUnits error:", err);
-      setError(err.message || "Failed to get units");
-      setUnits([]);
-      return [];
-    }
-  }
 
   function openModal(mode, unit) {
     setModalMode(mode);
@@ -201,8 +130,7 @@ export default function PropertyDetailsPage() {
           },
         }));
         closeModal();
-
-        await getUnits();
+        await fetchUnits();
       } else if (modalMode === "remove") {
         // Remove tenant
         const propertyId = String(params?.id || "");
@@ -245,7 +173,7 @@ export default function PropertyDetailsPage() {
           },
         }));
         closeModal();
-        await getUnits();
+        await fetchUnits();
       } else if (modalMode === "addUnit") {
         // Add unit
         const propertyId = String(params?.id || "");
@@ -296,7 +224,7 @@ export default function PropertyDetailsPage() {
           },
         }));
         closeModal();
-        await getUnits();
+        await fetchUnits();
       }
     } catch (err) {
       setActionMessage(`Error: ${err.message}`);
@@ -359,84 +287,110 @@ export default function PropertyDetailsPage() {
     };
   }, [status, session?.user?.id]);
 
-  React.useEffect(() => {
-    if (status === "loading") {
-      return;
+  const fetchUnits = React.useCallback(async () => {
+    if (!session?.user?.id || !params?.id) return;
+    try {
+      setError("");
+      setLoading(true);
+      const propertyId = String(params.id);
+      const unitsResponse = await fetch(
+        `${BACKEND_URL}/api/v1/units/${propertyId}`,
+        {
+          cache: "no-store",
+          headers: {
+            "x-user-id": session.user.id,
+          },
+        },
+      );
+      const unitsData = await unitsResponse.json();
+      if (!unitsResponse.ok) {
+        throw new Error(
+          unitsData?.detail || unitsData?.error || "Failed to load units",
+        );
+      }
+      const rawUnits = Array.isArray(unitsData)
+        ? unitsData
+        : Array.isArray(unitsData?.units)
+          ? unitsData.units
+          : [];
+      setUnits(rawUnits);
+    } catch (fetchError) {
+      console.error("Error loading units:", fetchError);
+      setError(fetchError.message || "Failed to load property data");
+      setUnits([]);
+    } finally {
+      setLoading(false);
     }
+  }, [session?.user?.id, params?.id]);
 
+  React.useEffect(() => {
+    if (status === "loading") return;
     if (status === "unauthenticated") {
       router.replace(APP_ROUTES.login);
       return;
     }
-
-    if (!session?.user?.id) {
-      return;
+    if (session?.user?.id) {
+      fetchUnits();
     }
+  }, [status, session?.user?.id, router, fetchUnits]);
 
-    let cancelled = false;
+function normalizeUnit(unitData) {
+  if (!unitData || typeof unitData !== "object") return null;
 
-    async function loadPageData() {
-      try {
-        setError("");
-        setLoading(true);
-        setUnitsLoading(true);
+  const tenantName =
+    unitData.tenantName ||
+    unitData.name ||
+    unitData.tenant_name ||
+    unitData.assignedTenantName ||
+    unitData.assigned_tenant_name ||
+    null;
+  const tenantEmail = unitData.tenantEmail || unitData.email || unitData.tenant_email || null;
+  const tenantPhone = unitData.tenantPhone || unitData.phone || unitData.tenant_phone || null;
+  const leaveDate = unitData.leaveDate || unitData.leave_date || null;
+  const leaseStartDate = unitData.leaseStartDate || unitData.start_date || null;
+  const leaseEndDate = unitData.leaseEndDate || unitData.end_date || null;
+  const monthlyRent = unitData.monthlyRent ?? (unitData.monthly_rent != null ? Number(unitData.monthly_rent) : null);
+  const squareFeet = unitData.squareFeet ?? unitData.square_feet ?? null;
+  const unitCode = unitData.unitCode || unitData.unit_code || unitData.code || "Unit";
+  const propertyId = unitData.propertyId || unitData.property_id || null;
 
-        const propertyId = String(params?.id || "");
-        const unitsResponse = await fetch(
-          `${BACKEND_URL}/api/v1/units/${propertyId}`,
-          {
-            cache: "no-store",
-            headers: {
-              "x-user-id": session?.user?.id || "",
-            },
-          },
-        );
+  return {
+    ...unitData,
+    id: unitData.id,
+    unitCode,
+    unit_code: unitCode,
+    propertyId,
+    property_id: propertyId,
+    bedrooms: unitData.bedrooms ?? unitData.bedroom_count ?? 0,
+    bathrooms: unitData.bathrooms ?? unitData.bathroom_count ?? 1,
+    squareFeet,
+    square_feet: squareFeet,
+    monthlyRent,
+    monthly_rent: monthlyRent,
+    tenantName,
+    tenantEmail,
+    tenantPhone,
+    name: tenantName,
+    leaveDate,
+    leave_date: leaveDate,
+    leaseStartDate,
+    leaseEndDate,
+  };
+}
 
-        const unitsData = await unitsResponse.json();
 
-        if (!unitsResponse.ok) {
-          throw new Error(
-            unitsData?.detail || unitsData?.error || "Failed to load units",
-          );
-        }
 
-        if (!cancelled) {
-          setUnits(normalizeUnits(unitsData));
-        }
-      } catch (fetchError) {
-        console.error("Error loading units:", fetchError);
-        if (!cancelled) {
-          setError(fetchError.message || "Failed to load property data");
-          setUnits([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-          setUnitsLoading(false);
-        }
-      }
-    }
+  const allUnits = React.useMemo(() => {
+    const rawList = Array.isArray(property?.units)
+      ? property.units
+      : Array.isArray(units)
+        ? units
+        : Array.isArray(property)
+          ? property
+          : [];
+    return rawList.map(normalizeUnit).filter(Boolean);
+  }, [property, units]);
 
-    loadPageData();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [params?.id, router, session?.user?.id, status]);
-
-  React.useEffect(() => {
-    if (!actionMessage) {
-      return;
-    }
-
-    const timeoutId = setTimeout(() => {
-      setActionMessage("");
-    }, 3500);
-
-    return () => clearTimeout(timeoutId);
-  }, [actionMessage]);
-
-  const allUnits = units || [];
   const [unitFilter, setUnitFilter] = React.useState("all");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -466,7 +420,7 @@ export default function PropertyDetailsPage() {
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   }
 
-  //figure out what it dus
+
   function getInitials(name) {
     if (!name) return "?";
     const parts = name.trim().split(/\s+/);
@@ -474,6 +428,7 @@ export default function PropertyDetailsPage() {
       ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
       : name.slice(0, 2).toUpperCase();
   }
+  
 
   const occupiedCount = allUnits.filter(
     (u) => getUnitStatus(u) === "occupied",
@@ -484,6 +439,7 @@ export default function PropertyDetailsPage() {
   const maintenanceCount = allUnits.filter(
     (u) => getUnitStatus(u) === "maintenance",
   ).length;
+
   const occupancyPct =
     allUnits.length > 0
       ? ((occupiedCount / allUnits.length) * 100).toFixed(1)
@@ -510,6 +466,7 @@ export default function PropertyDetailsPage() {
     (safePage - 1) * ITEMS_PER_PAGE,
     safePage * ITEMS_PER_PAGE,
   );
+
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-6'>
       {/* ── Loading ──────────────────────────────────────────────── */}
@@ -679,7 +636,7 @@ export default function PropertyDetailsPage() {
             </div>
 
             {/* Table */}
-            {unitsLoading ? (
+            {loading ? (
               <div className='py-12 text-center text-sm text-slate-400'>
                 Loading units...
               </div>
@@ -715,142 +672,143 @@ export default function PropertyDetailsPage() {
                       const initials = getInitials(unit.name);
                       const avatarColor = getAvatarColor(unit.name);
                       return (
-                        <tr
-                          key={unit.id}
-                          className='border-b border-slate-100 last:border-0 hover:bg-slate-50'>
-                          {/* Unit Info */}
-                          <td className='px-4 py-4'>
-                            <div className='flex items-center gap-3'>
-                              <div
-                                className='h-12 w-12 shrink-0 rounded-lg'
-                                style={{
-                                  background:
-                                    "linear-gradient(135deg, #2dd4bf, #3b82f6)",
-                                }}
-                              />
-                              <div>
-                                <p className='font-bold text-slate-900'>
-                                  {unit.unitCode || "Unit"}
-                                </p>
-                                <p className='text-xs text-slate-400'>
-                                  {unit.bedrooms} bed • {unit.bathrooms} bath
-                                  {unit.squareFeet
-                                    ? ` • ${unit.squareFeet} sqft`
-                                    : ""}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
+												<tr
+													key={unit.id}
+													className='border-b border-slate-100 last:border-0 hover:bg-slate-50'>
+													{/* Unit Info */}
+													<td className='px-4 py-4'>
+														<div className='flex items-center gap-3'>
+															<div
+																className='h-12 w-12 shrink-0 rounded-lg'
+																style={{
+																	background:
+																		"linear-gradient(135deg, #2dd4bf, #3b82f6)",
+																}}
+															/>
+															<div>
+																<p className='font-bold text-slate-900'>
+																	{unit.unitCode || "Unit"}
+																</p>
+																<p className='text-xs text-slate-400'>
+																	{unit.bedrooms} bed • {unit.bathrooms}{" "}
+																	bath
+																	{unit.squareFeet
+																		? ` • ${unit.squareFeet} sqft`
+																		: ""}
+																</p>
+															</div>
+														</div>
+													</td>
 
-                          {/* Tenant Details */}
-                          <td className='px-4 py-4'>
-                            {unit.name ? (
-                              <div className='flex items-center gap-2.5'>
-                                <div
-                                  className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white'
-                                  style={{ backgroundColor: avatarColor }}>
-                                  {initials}
-                                </div>
-                                <div>
-                                  <p className='font-semibold text-slate-800'>
-                                    {unit.name}
-                                  </p>
-                                  <p className='text-xs text-slate-400'>
-                                    Primary Tenant
-                                  </p>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className='flex items-center gap-2.5'>
-                                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-500'>
-                                  —
-                                </div>
-                                <div>
-                                  <p className='text-sm font-medium text-slate-400'>
-                                    Not Assigned
-                                  </p>
-                                  <p className='text-xs text-slate-400'>
-                                    Ready for Lease
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-                          </td>
+													{/* Tenant Details */}
+													<td className='px-4 py-4'>
+														{unit.name ? (
+															<div className='flex items-center gap-2.5'>
+																<div
+																	className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white'
+																	style={{ backgroundColor: avatarColor }}>
+																	{initials}
+																</div>
+																<div>
+																	<p className='font-semibold text-slate-800'>
+																		{unit.name}
+																	</p>
+																	<p className='text-xs text-slate-400'>
+																		Primary Tenant
+																	</p>
+																</div>
+															</div>
+														) : (
+															<div className='flex items-center gap-2.5'>
+																<div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-500'>
+																	—
+																</div>
+																<div>
+																	<p className='text-sm font-medium text-slate-400'>
+																		Not Assigned
+																	</p>
+																	<p className='text-xs text-slate-400'>
+																		Ready for Lease
+																	</p>
+																</div>
+															</div>
+														)}
+													</td>
 
-                          {/* Space & Lease */}
-                          <td className='px-4 py-4'>
-                            <p className='font-medium text-slate-700'>
-                              {unit.squareFeet
-                                ? `${Number(unit.squareFeet).toLocaleString()} sq ft`
-                                : "—"}
-                            </p>
-                            <p className='text-xs text-slate-400'>
-                              {unit.leaveDate
-                                ? `Ends ${new Date(unit.leaveDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-                                : status === "occupied"
-                                  ? "Active lease"
-                                  : "Available Now"}
-                            </p>
-                          </td>
+													{/* Space & Lease */}
+													<td className='px-4 py-4'>
+														<p className='font-medium text-slate-700'>
+															{unit.squareFeet
+																? `${Number(unit.squareFeet).toLocaleString()} sq ft`
+																: "—"}
+														</p>
+														<p className='text-xs text-slate-400'>
+															{unit.leaveDate
+																? `Ends ${new Date(unit.leaveDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+																: status === "occupied"
+																	? "Active lease"
+																	: "Available Now"}
+														</p>
+													</td>
 
-                          {/* Status */}
-                          <td className='px-4 py-4'>
-                            {status === "occupied" && (
-                              <span className='inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700'>
-                                <span className='h-1.5 w-1.5 rounded-full bg-green-500' />
-                                OCCUPIED
-                              </span>
-                            )}
-                            {status === "vacant" && (
-                              <span className='inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600'>
-                                <span className='h-1.5 w-1.5 rounded-full bg-red-500' />
-                                VACANT
-                              </span>
-                            )}
-                            {status === "maintenance" && (
-                              <span className='inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700'>
-                                <span className='h-1.5 w-1.5 rounded-full bg-purple-500' />
-                                MAINTENANCE
-                              </span>
-                            )}
-                          </td>
+													{/* Status */}
+													<td className='px-4 py-4'>
+														{status === "occupied" && (
+															<span className='inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700'>
+																<span className='h-1.5 w-1.5 rounded-full bg-green-500' />
+																OCCUPIED
+															</span>
+														)}
+														{status === "vacant" && (
+															<span className='inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600'>
+																<span className='h-1.5 w-1.5 rounded-full bg-red-500' />
+																VACANT
+															</span>
+														)}
+														{status === "maintenance" && (
+															<span className='inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700'>
+																<span className='h-1.5 w-1.5 rounded-full bg-purple-500' />
+																MAINTENANCE
+															</span>
+														)}
+													</td>
 
-                          {/* Actions */}
-                          <td className='px-4 py-4'>
-                            <div className='flex flex-wrap items-center gap-2'>
-                              {unit.name ? (
-                                unit.leaveDate ? (
-                                  <button
-                                    type='button'
-                                    disabled
-                                    className='cursor-not-allowed rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-600 opacity-70'>
-                                    Leaving
-                                  </button>
-                                ) : (
-                                  <button
-                                    type='button'
-                                    onClick={() => openModal("remove", unit)}
-                                    className='rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100'>
-                                    Remove Tenant
-                                  </button>
-                                )
-                              ) : (
-                                <button
-                                  type='button'
-                                  onClick={() => openModal("add", unit)}
-                                  className='rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100'>
-                                  Add Tenant
-                                </button>
-                              )}
-                              <Link
-                                href={`/Units/${unit.id}`}
-                                className='rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>
-                                View Details
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      );
+													{/* Actions */}
+													<td className='px-4 py-4'>
+														<div className='flex flex-wrap items-center gap-2'>
+															{unit.name ? (
+																unit.leaveDate ? (
+																	<button
+																		type='button'
+																		disabled
+																		className='cursor-not-allowed rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-600 opacity-70'>
+																		Leaving
+																	</button>
+																) : (
+																	<button
+																		type='button'
+																		onClick={() => openModal("remove", unit)}
+																		className='rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100'>
+																		Remove Tenant
+																	</button>
+																)
+															) : (
+																<button
+																	type='button'
+																	onClick={() => openModal("add", unit)}
+																	className='rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100'>
+																	Add Tenant
+																</button>
+															)}
+															<Link
+																href={`/Units/${unit.id}`}
+																className='rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>
+																View Details
+															</Link>
+														</div>
+													</td>
+												</tr>
+											);
                     })}
                   </tbody>
                 </table>
