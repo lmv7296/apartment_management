@@ -2,9 +2,12 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import { APP_ROUTES } from "@/config/routes";
 import NewProperty from "./NewPropertie";
+
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
 export default function PropertiesPage() {
   const { data: session, status } = useSession();
@@ -22,31 +25,24 @@ export default function PropertiesPage() {
 
   const ITEMS_PER_PAGE = 10;
 
-  const headerStats = React.useMemo(() => {
-    const propertyCount = properties.length;
-    const unitCount = properties.reduce(
-      (sum, property) => sum + Number(property.unitCount || 0),
-      0,
-    );
-    const tenantCount = properties.reduce(
-      (sum, property) => sum + Number(property.tenantCount || 0),
-      0,
-    );
-    return { propertyCount, unitCount, tenantCount };
-  }, [properties]);
-
   React.useEffect(() => {
     if (status === "unauthenticated") {
       router.replace(APP_ROUTES.login);
       return;
+    }
+    if (status === "authenticated") {
+      loadProperties();
     }
 
     async function loadProperties() {
       try {
         setLoading(true);
         setError("");
-        const response = await fetch("/api/v1/Properties", {
+        const response = await fetch(`${BACKEND_URL}/api/v1/properties`, {
           cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || "",
+          },
         });
         const data = await response.json();
 
@@ -55,8 +51,9 @@ export default function PropertiesPage() {
             data?.detail || data?.error || "Failed to load properties",
           );
         }
-
-        setProperties(Array.isArray(data) ? data : []);
+        const sortedProperties = Array.isArray(data) ? data : [];
+        setProperties(sortedProperties);
+        sessionStorage.setItem("properties", JSON.stringify(sortedProperties));
       } catch (loadError) {
         setProperties([]);
         setError(loadError.message || "Failed to load properties");
@@ -64,9 +61,7 @@ export default function PropertiesPage() {
         setLoading(false);
       }
     }
-
-    loadProperties();
-  }, [status, router]);
+  }, [status, router, session?.user?.id]);
 
   React.useEffect(() => {
     if (status !== "authenticated") {
@@ -75,14 +70,18 @@ export default function PropertiesPage() {
 
     let cancelled = false;
 
-    async function loadUnitPreferences() {
+    async function loadUserSettings() {
       try {
-        const response = await fetch("/api/v1/user-settings", {
+        const response = await fetch(`${BACKEND_URL}/api/v1/user-settings`, {
           cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || "",
+          },
         });
         if (!response.ok) return;
 
         const payload = await response.json();
+        sessionStorage.setItem("userSettings", JSON.stringify(payload));
         if (!cancelled) {
           setPreferredUnitPrefix(String(payload?.unitPrefix ?? "Unit"));
           setPreferredUnitCount(Number(payload?.unitCount ?? 0) || 0);
@@ -95,7 +94,7 @@ export default function PropertiesPage() {
       }
     }
 
-    loadUnitPreferences();
+    loadUserSettings();
 
     return () => {
       cancelled = true;
@@ -127,14 +126,31 @@ export default function PropertiesPage() {
     safePage * ITEMS_PER_PAGE,
   );
 
+  const headerStats = React.useMemo(() => {
+    const propertyCount = properties.length;
+    const unitCount = properties.reduce((sum, property) => {
+      const units = Array.isArray(property.units) ? property.units : [];
+      return sum + units.length;
+    }, 0);
+    const tenantCount = properties.reduce((sum, property) => {
+      const units = Array.isArray(property.units) ? property.units : [];
+      return (
+        sum + units.filter((unit) => Boolean(unit?.assigned_tenant)).length
+      );
+    }, 0);
+    return { propertyCount, unitCount, tenantCount };
+  }, [properties]);
   async function handleCreateProperty(payload) {
     try {
       setIsCreatingProperty(true);
       setCreateError("");
 
-      const response = await fetch("/api/v1/Properties", {
+      const response = await fetch(`${BACKEND_URL}/api/v1/properties`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": session?.user?.id || "",
+        },
         body: JSON.stringify(payload),
       });
       const data = await response.json();
@@ -279,7 +295,7 @@ export default function PropertiesPage() {
               type='text'
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder='Search by name, address or city...'
+              placeholder='Search by name or address'
               className='w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-200'
             />
           </div>
@@ -322,84 +338,93 @@ export default function PropertiesPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedProps.map((property) => (
-                  <tr
-                    key={property.id}
-                    className='border-b border-slate-100 last:border-0 hover:bg-slate-50'>
-                    {/* Property */}
-                    <td className='px-4 py-4'>
-                      <div className='flex items-center gap-3'>
-                        <div
-                          className='flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-white'
-                          style={{
-                            background:
-                              "linear-gradient(135deg, #2dd4bf, #3b82f6)",
-                          }}>
-                          <svg
-                            className='h-6 w-6'
-                            viewBox='0 0 20 20'
-                            fill='currentColor'>
-                            <path
-                              fillRule='evenodd'
-                              d='M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2H4a1 1 0 010-2V4zm3 1h2v2H7V5zm4 0h2v2h-2V5zM7 9h2v2H7V9zm4 0h2v2h-2V9z'
-                              clipRule='evenodd'
-                            />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className='font-bold text-slate-900'>
-                            {property.name}
-                          </p>
-                          <p className='text-xs text-slate-400'>
-                            Added{" "}
-                            {property.createdAt
-                              ? new Date(property.createdAt).toLocaleDateString(
-                                  "en-US",
-                                  {
+                {paginatedProps.map((property) => {
+                  const propertyUnits = Array.isArray(property.units)
+                    ? property.units
+                    : [];
+                  const unitCount = propertyUnits.length;
+                  const tenantCount = propertyUnits.filter((unit) =>
+                    Boolean(unit?.assigned_tenant),
+                  ).length;
+
+                  return (
+                    <tr
+                      key={property.id}
+                      className='border-b border-slate-100 last:border-0 hover:bg-slate-50'>
+                      {/* Property */}
+                      <td className='px-4 py-4'>
+                        <div className='flex items-center gap-3'>
+                          <div
+                            className='flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-white'
+                            style={{
+                              background:
+                                "linear-gradient(135deg, #2dd4bf, #3b82f6)",
+                            }}>
+                            <svg
+                              className='h-6 w-6'
+                              viewBox='0 0 20 20'
+                              fill='currentColor'>
+                              <path
+                                fillRule='evenodd'
+                                d='M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2H4a1 1 0 010-2V4zm3 1h2v2H7V5zm4 0h2v2h-2V5zM7 9h2v2H7V9zm4 0h2v2h-2V9z'
+                                clipRule='evenodd'
+                              />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className='font-bold text-slate-900'>
+                              {property.name}
+                            </p>
+                            <p className='text-xs text-slate-400'>
+                              Added{" "}
+                              {property.createdAt
+                                ? new Date(
+                                    property.createdAt,
+                                  ).toLocaleDateString("en-US", {
                                     month: "short",
                                     year: "numeric",
-                                  },
-                                )
-                              : "—"}
-                          </p>
+                                  })
+                                : "—"}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Location */}
-                    <td className='px-4 py-4'>
-                      <p className='text-slate-700'>{property.address}</p>
-                      <p className='text-xs text-slate-400'>
-                        {property.city}, {property.state}
-                      </p>
-                    </td>
+                      {/* Location */}
+                      <td className='px-4 py-4'>
+                        <p className='text-slate-700'>{property.address}</p>
+                        <p className='text-xs text-slate-400'>
+                          {property.city}, {property.state}
+                        </p>
+                      </td>
 
-                    {/* Units */}
-                    <td className='px-4 py-4'>
-                      <p className='font-semibold text-slate-900'>
-                        {property.unitCount ?? 0}
-                      </p>
-                      <p className='text-xs text-slate-400'>total units</p>
-                    </td>
+                      {/* Units */}
+                      <td className='px-4 py-4'>
+                        <p className='font-semibold text-slate-900'>
+                          {unitCount}
+                        </p>
+                        <p className='text-xs text-slate-400'>total units</p>
+                      </td>
 
-                    {/* Tenants */}
-                    <td className='px-4 py-4'>
-                      <p className='font-semibold text-slate-900'>
-                        {property.tenantCount ?? 0}
-                      </p>
-                      <p className='text-xs text-slate-400'>active leases</p>
-                    </td>
+                      {/* Tenants */}
+                      <td className='px-4 py-4'>
+                        <p className='font-semibold text-slate-900'>
+                          {tenantCount}
+                        </p>
+                        <p className='text-xs text-slate-400'>active leases</p>
+                      </td>
 
-                    {/* Actions */}
-                    <td className='px-4 py-4'>
-                      <Link
-                        href={`/Properties/${property.id}`}
-                        className='rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>
-                        View Details
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Actions */}
+                      <td className='px-4 py-4'>
+                        <Link
+                          href={`/Properties/${property.id}`}
+                          className='rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>
+                          View Details
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

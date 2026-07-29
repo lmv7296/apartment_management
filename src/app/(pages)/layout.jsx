@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import { usePathname } from "next/navigation";
 import ManagerSidebar from "@/app/components/dashboard/ManagerSidebar";
 

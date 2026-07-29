@@ -2,12 +2,13 @@
 
 import React from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import { useRouter } from "next/navigation";
 import { APP_ROUTES } from "@/config/routes";
 import { formatMoney } from "@/utils/formatters/formatMoney";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
-// ─── Activity level dot colour ────────────────────────────────────────────────
+
 const LEVEL_DOT = {
   high: "#22c55e",
   medium: "#6366f1",
@@ -23,7 +24,9 @@ const EMPTY_METRICS = {
   totalProperties: 0,
   occupiedUnits: 0,
   vacantUnits: 0,
-  rentCollectedMonth: 0,
+  occupancyRate: 0,
+  monthlyRevenue: 0,
+  maintenanceRequests: 0,
   overduePayments: 0,
 };
 
@@ -70,8 +73,11 @@ export default function ManagerDashboard() {
       setLoadError("");
 
       try {
-        const response = await fetch("/api/v1/dashboard", {
+        const response = await fetch(`${BACKEND_URL}/api/v1/dashboard`, {
           cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || ""
+          }
         });
 
         if (!response.ok) {
@@ -117,8 +123,11 @@ export default function ManagerDashboard() {
 
     async function loadUserCurrency() {
       try {
-        const response = await fetch("/api/v1/user-settings", {
+        const response = await fetch(`${BACKEND_URL}/api/v1/user-settings`, {
           cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || "",
+          },
         });
 
         if (!response.ok) {

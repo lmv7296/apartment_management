@@ -3,6 +3,8 @@
 import React from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useSession } from "@/app/providers";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
 const ConstructionModal = dynamic(
   () => import("@/app/components/modals/addConstructionModal"),
@@ -12,6 +14,7 @@ const ConstructionModal = dynamic(
 );
 
 export default function Construction() {
+  const { data: session } = useSession();
   const [construction, setConstruction] = React.useState(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isConstructionModalOpen, setIsConstructionModalOpen] =
@@ -20,7 +23,11 @@ export default function Construction() {
   React.useEffect(() => {
     async function fetchConstruction() {
       try {
-        const response = await fetch("/api/v1/construction");
+        const response = await fetch(`${BACKEND_URL}/api/v1/construction`, {
+          headers: {
+            "x-user-id": session?.user?.id || ""
+          }
+        });
         const data = await response.json();
 
         if (!response.ok) {
@@ -35,16 +42,21 @@ export default function Construction() {
         setIsLoading(false);
       }
     }
-    fetchConstruction();
-  }, []);
+    if (session?.user?.id) {
+      fetchConstruction();
+    }
+  }, [session?.user?.id]);
 
   const handleProjectSave = async (payload) => {
     try {
       setIsLoading(true);
       console.log("Submitting Construction Payload:", payload);
-      const res = await fetch("/api/v1/construction", {
+      const res = await fetch(`${BACKEND_URL}/api/v1/construction`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-user-id": session?.user?.id || ""
+        },
         body: JSON.stringify(payload),
       });
 

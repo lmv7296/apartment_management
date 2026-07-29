@@ -114,6 +114,23 @@ export default function AddTenantModal({
         </label>
         <label className='flex flex-col gap-1'>
           <span className='text-xs font-semibold uppercase app-text-muted'>
+            Lease End
+          </span>
+          <input
+            required
+            type='date'
+            name='endDate'
+            value={formData.endDate}
+            onChange={onChangeForm}
+            className='rounded-xl border px-3 py-2 outline-none'
+            style={{
+              borderColor: "var(--border)",
+              backgroundColor: "var(--surface-2)",
+            }}
+          />
+        </label>
+        <label className='flex flex-col gap-1'>
+          <span className='text-xs font-semibold uppercase app-text-muted'>
             Monthly Rent
           </span>
           <div className='grid grid-cols-[1fr_auto]'>

@@ -3,7 +3,7 @@
 import React from "react";
 import ManagerDashboard from "./managerDashboard";
 import TenantDashboard from "./tenantDashboard";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import { useRouter } from "next/navigation";
 import { APP_ROUTES } from "@/config/routes";
 

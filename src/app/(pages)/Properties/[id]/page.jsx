@@ -3,24 +3,30 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import { APP_ROUTES } from "@/config/routes";
 import userPreferences from "@/config/user-preferences.json";
 import AddTenantModal from "@/app/components/modals/AddTenantModal";
 import RemoveTenantModal from "@/app/components/modals/RemoveTenantModal";
 import AddUnitModal from "@/app/components/modals/AddUnitModal";
 
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
 export default function PropertyDetailsPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
 
+  const settingsLoadedRef = React.useRef(false);
   const [property, setProperty] = React.useState(null);
+  const [units, setUnits] = React.useState([]);
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [modalMode, setModalMode] = React.useState("");
   const [activeUnit, setActiveUnit] = React.useState(null);
   const [actionMessage, setActionMessage] = React.useState("");
+
   const [userCurrency, setUserCurrency] = React.useState(
     userPreferences.defaultSettings.currency,
   );
@@ -30,6 +36,7 @@ export default function PropertyDetailsPage() {
       email: "",
       phone: "",
       startDate: "",
+      endDate: "",
       monthlyRent: "",
       currency: userPreferences.defaultSettings.currency,
       notes: "",
@@ -79,11 +86,12 @@ export default function PropertyDetailsPage() {
       if (modalMode === "add") {
         const propertyId = String(params?.id || "");
         const response = await fetch(
-          `/api/v1/Properties/${propertyId}/add-tenant`,
+          `${BACKEND_URL}/api/v1/properties/${propertyId}/add-tenant`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              "x-user-id": session?.user?.id || "",
             },
             body: JSON.stringify({
               unitId: activeUnit?.id,
@@ -91,6 +99,7 @@ export default function PropertyDetailsPage() {
               email: formData.add.email,
               phone: formData.add.phone,
               startDate: formData.add.startDate,
+              endDate: formData.add.endDate,
               monthlyRent: formData.add.monthlyRent,
               notes: formData.add.notes,
               currency: formData.add.currency,
@@ -114,31 +123,24 @@ export default function PropertyDetailsPage() {
             email: "",
             phone: "",
             startDate: "",
+            endDate: "",
             monthlyRent: "",
             currency: userCurrency,
             notes: "",
           },
         }));
         closeModal();
-
-        // Reload property data
-        const propertyResponse = await fetch(
-          `/api/v1/Properties/${propertyId}`,
-          {
-            cache: "no-store",
-          },
-        );
-        const propertyData = await propertyResponse.json();
-        setProperty(propertyData);
+        await fetchUnits();
       } else if (modalMode === "remove") {
         // Remove tenant
         const propertyId = String(params?.id || "");
         const response = await fetch(
-          `/api/v1/Properties/${propertyId}/remove-tenant`,
+          `${BACKEND_URL}/api/v1/properties/${propertyId}/remove-tenant`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              "x-user-id": session?.user?.id || "",
             },
             body: JSON.stringify({
               unitId: activeUnit?.id,
@@ -171,15 +173,7 @@ export default function PropertyDetailsPage() {
           },
         }));
         closeModal();
-        // Reload property data
-        const propertyResponse = await fetch(
-          `/api/v1/Properties/${propertyId}`,
-          {
-            cache: "no-store",
-          },
-        );
-        const propertyData = await propertyResponse.json();
-        setProperty(propertyData);
+        await fetchUnits();
       } else if (modalMode === "addUnit") {
         // Add unit
         const propertyId = String(params?.id || "");
@@ -193,18 +187,22 @@ export default function PropertyDetailsPage() {
               ? Math.round(parsedArea * 10.7639)
               : Math.round(parsedArea);
 
-        const response = await fetch(`/api/v1/Properties/${propertyId}/units`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
+        const response = await fetch(
+          `${BACKEND_URL}/api/v1/properties/${propertyId}/units`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-user-id": session?.user?.id || "",
+            },
+            body: JSON.stringify({
+              unitCode: formData.addUnit.unitCode,
+              bedrooms: parseInt(formData.addUnit.bedrooms) || 0,
+              bathrooms: parseInt(formData.addUnit.bathrooms) || 1,
+              squareFeet: normalizedSquareFeet,
+            }),
           },
-          body: JSON.stringify({
-            unitCode: formData.addUnit.unitCode,
-            bedrooms: parseInt(formData.addUnit.bedrooms) || 0,
-            bathrooms: parseInt(formData.addUnit.bathrooms) || 1,
-            squareFeet: normalizedSquareFeet,
-          }),
-        });
+        );
 
         const data = await response.json();
 
@@ -226,15 +224,7 @@ export default function PropertyDetailsPage() {
           },
         }));
         closeModal();
-        // Reload property data
-        const propertyResponse = await fetch(
-          `/api/v1/Properties/${propertyId}`,
-          {
-            cache: "no-store",
-          },
-        );
-        const propertyData = await propertyResponse.json();
-        setProperty(propertyData);
+        await fetchUnits();
       }
     } catch (err) {
       setActionMessage(`Error: ${err.message}`);
@@ -242,23 +232,38 @@ export default function PropertyDetailsPage() {
   }
 
   React.useEffect(() => {
-    if (status === "unauthenticated") {
-      router.replace(APP_ROUTES.login);
+    if (status !== "authenticated" || !session?.user?.id) {
       return;
     }
+    const propertyId = String(params?.id || "");
+    const cachedData = sessionStorage.getItem("properties");
 
-    if (status !== "authenticated") {
-      return;
-    }
+    setProperty(
+      cachedData
+        ? JSON.parse(cachedData).find((p) => p.id === propertyId)
+        : null,
+    );
+    let cancelled = false;
 
-    async function loadUserSettings() {
+    async function loadUserSettingsOnce() {
       try {
-        const response = await fetch("/api/v1/user-settings", {
+        const response = await fetch(`${BACKEND_URL}/api/v1/user-settings`, {
           cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || "",
+          },
         });
-        const data = await response.json();
 
-        if (response.ok && data.currency) {
+        if (!response.ok || cancelled) {
+          return;
+        }
+
+        const data = await response.json();
+        if (cancelled) {
+          return;
+        }
+
+        if (data?.currency) {
           setUserCurrency(data.currency);
           setFormData((prev) => ({
             ...prev,
@@ -270,52 +275,122 @@ export default function PropertyDetailsPage() {
         }
       } catch (err) {
         console.error("Failed to load user settings:", err);
-      }
-    }
-
-    async function loadProperty() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const propertyId = String(params?.id || "");
-        const response = await fetch(`/api/v1/Properties/${propertyId}`, {
-          cache: "no-store",
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data?.detail || data?.error || "Failed to load property",
-          );
-        }
-
-        setProperty(data);
-      } catch (loadError) {
-        setProperty(null);
-        setError(loadError.message || "Failed to load property");
       } finally {
-        setLoading(false);
+        settingsLoadedRef.current = true;
       }
     }
 
-    loadUserSettings();
-    loadProperty();
-  }, [params, router, status]);
+    loadUserSettingsOnce();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status, session?.user?.id]);
+
+  const fetchUnits = React.useCallback(async () => {
+    if (!session?.user?.id || !params?.id) return;
+    try {
+      setError("");
+      setLoading(true);
+      const propertyId = String(params.id);
+      const unitsResponse = await fetch(
+        `${BACKEND_URL}/api/v1/units/${propertyId}`,
+        {
+          cache: "no-store",
+          headers: {
+            "x-user-id": session.user.id,
+          },
+        },
+      );
+      const unitsData = await unitsResponse.json();
+      if (!unitsResponse.ok) {
+        throw new Error(
+          unitsData?.detail || unitsData?.error || "Failed to load units",
+        );
+      }
+      const rawUnits = Array.isArray(unitsData)
+        ? unitsData
+        : Array.isArray(unitsData?.units)
+          ? unitsData.units
+          : [];
+      setUnits(rawUnits);
+    } catch (fetchError) {
+      console.error("Error loading units:", fetchError);
+      setError(fetchError.message || "Failed to load property data");
+      setUnits([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [session?.user?.id, params?.id]);
 
   React.useEffect(() => {
-    if (!actionMessage) {
+    if (status === "loading") return;
+    if (status === "unauthenticated") {
+      router.replace(APP_ROUTES.login);
       return;
     }
+    if (session?.user?.id) {
+      fetchUnits();
+    }
+  }, [status, session?.user?.id, router, fetchUnits]);
 
-    const timeoutId = setTimeout(() => {
-      setActionMessage("");
-    }, 3500);
+function normalizeUnit(unitData) {
+  if (!unitData || typeof unitData !== "object") return null;
 
-    return () => clearTimeout(timeoutId);
-  }, [actionMessage]);
+  const tenantName =
+    unitData.tenantName ||
+    unitData.name ||
+    unitData.tenant_name ||
+    unitData.assignedTenantName ||
+    unitData.assigned_tenant_name ||
+    null;
+  const tenantEmail = unitData.tenantEmail || unitData.email || unitData.tenant_email || null;
+  const tenantPhone = unitData.tenantPhone || unitData.phone || unitData.tenant_phone || null;
+  const leaveDate = unitData.leaveDate || unitData.leave_date || null;
+  const leaseStartDate = unitData.leaseStartDate || unitData.start_date || null;
+  const leaseEndDate = unitData.leaseEndDate || unitData.end_date || null;
+  const monthlyRent = unitData.monthlyRent ?? (unitData.monthly_rent != null ? Number(unitData.monthly_rent) : null);
+  const squareFeet = unitData.squareFeet ?? unitData.square_feet ?? null;
+  const unitCode = unitData.unitCode || unitData.unit_code || unitData.code || "Unit";
+  const propertyId = unitData.propertyId || unitData.property_id || null;
 
-  // ── View state ─────────────────────────────────────────────────────
+  return {
+    ...unitData,
+    id: unitData.id,
+    unitCode,
+    unit_code: unitCode,
+    propertyId,
+    property_id: propertyId,
+    bedrooms: unitData.bedrooms ?? unitData.bedroom_count ?? 0,
+    bathrooms: unitData.bathrooms ?? unitData.bathroom_count ?? 1,
+    squareFeet,
+    square_feet: squareFeet,
+    monthlyRent,
+    monthly_rent: monthlyRent,
+    tenantName,
+    tenantEmail,
+    tenantPhone,
+    name: tenantName,
+    leaveDate,
+    leave_date: leaveDate,
+    leaseStartDate,
+    leaseEndDate,
+  };
+}
+
+
+
+  const allUnits = React.useMemo(() => {
+    const rawList = Array.isArray(property?.units)
+      ? property.units
+      : Array.isArray(units)
+        ? units
+        : Array.isArray(property)
+          ? property
+          : [];
+    return rawList.map(normalizeUnit).filter(Boolean);
+  }, [property, units]);
+
   const [unitFilter, setUnitFilter] = React.useState("all");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -324,23 +399,28 @@ export default function PropertyDetailsPage() {
     setCurrentPage(1);
   }, [unitFilter, searchQuery]);
 
-  // ── Helpers ────────────────────────────────────────────────────────
-  const ITEMS_PER_PAGE = 10;
-
   function getUnitStatus(unit) {
-    if (!unit.tenantName) return "vacant";
+    if (!unit.name) return "vacant";
     if (unit.leaveDate) return "maintenance";
     return "occupied";
   }
 
-  const AVATAR_COLORS = ["#1d4ed8", "#7c3aed", "#059669", "#b45309", "#dc2626"];
   function getAvatarColor(name) {
+    const AVATAR_COLORS = [
+      "#1d4ed8",
+      "#7c3aed",
+      "#059669",
+      "#b45309",
+      "#dc2626",
+    ];
     if (!name) return "#94a3b8";
     let hash = 0;
     for (let i = 0; i < name.length; i++)
       hash = (hash << 5) - hash + name.charCodeAt(i);
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   }
+
+
   function getInitials(name) {
     if (!name) return "?";
     const parts = name.trim().split(/\s+/);
@@ -348,9 +428,8 @@ export default function PropertyDetailsPage() {
       ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
       : name.slice(0, 2).toUpperCase();
   }
+  
 
-  // ── Computed ───────────────────────────────────────────────────────
-  const allUnits = property?.units || [];
   const occupiedCount = allUnits.filter(
     (u) => getUnitStatus(u) === "occupied",
   ).length;
@@ -360,6 +439,7 @@ export default function PropertyDetailsPage() {
   const maintenanceCount = allUnits.filter(
     (u) => getUnitStatus(u) === "maintenance",
   ).length;
+
   const occupancyPct =
     allUnits.length > 0
       ? ((occupiedCount / allUnits.length) * 100).toFixed(1)
@@ -372,10 +452,11 @@ export default function PropertyDetailsPage() {
     const matchesSearch =
       !q ||
       (unit.unitCode || "").toLowerCase().includes(q) ||
-      (unit.tenantName || "").toLowerCase().includes(q);
+      (unit.name || "").toLowerCase().includes(q);
     return matchesFilter && matchesSearch;
   });
 
+  const ITEMS_PER_PAGE = 10;
   const totalPages = Math.max(
     1,
     Math.ceil(filteredUnits.length / ITEMS_PER_PAGE),
@@ -402,8 +483,7 @@ export default function PropertyDetailsPage() {
         </div>
       ) : null}
 
-      {/* ── Main content ─────────────────────────────────────────── */}
-      {!loading && !error && property ? (
+      {!loading && !error ? (
         <>
           {/* Breadcrumb */}
           <nav className='mb-4 flex items-center gap-1.5 text-xs font-medium text-slate-400'>
@@ -414,7 +494,7 @@ export default function PropertyDetailsPage() {
             </Link>
             <span>/</span>
             <span className='font-semibold text-slate-700'>
-              {property.name}
+              Property {property?.name}
             </span>
           </nav>
 
@@ -422,21 +502,8 @@ export default function PropertyDetailsPage() {
           <div className='mb-6 flex flex-wrap items-start justify-between gap-4'>
             <div>
               <h1 className='text-3xl font-black text-slate-900'>
-                {property.name}
+                Property {property?.name}
               </h1>
-              <p className='mt-1 flex items-center gap-1.5 text-sm text-slate-500'>
-                <svg
-                  className='h-4 w-4 shrink-0'
-                  viewBox='0 0 20 20'
-                  fill='currentColor'>
-                  <path
-                    fillRule='evenodd'
-                    d='M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z'
-                    clipRule='evenodd'
-                  />
-                </svg>
-                {property.address}, {property.city}, {property.state}
-              </p>
             </div>
             <div className='flex items-center gap-3'>
               <button
@@ -538,7 +605,7 @@ export default function PropertyDetailsPage() {
                   type='text'
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder='Search by unit, tenant or status...'
+                  placeholder='Search by unit, tenant'
                   className='w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-200'
                 />
               </div>
@@ -569,9 +636,15 @@ export default function PropertyDetailsPage() {
             </div>
 
             {/* Table */}
-            {paginatedUnits.length === 0 ? (
+            {loading ? (
               <div className='py-12 text-center text-sm text-slate-400'>
-                No units match your search or filter.
+                Loading units...
+              </div>
+            ) : paginatedUnits.length === 0 ? (
+              <div className='py-12 text-center text-sm text-slate-400'>
+                {searchQuery || unitFilter !== "all"
+                  ? "No units match your search or filter."
+                  : "No units have been added to this property yet."}
               </div>
             ) : (
               <div className='overflow-x-auto'>
@@ -596,145 +669,146 @@ export default function PropertyDetailsPage() {
                   <tbody>
                     {paginatedUnits.map((unit) => {
                       const status = getUnitStatus(unit);
-                      const initials = getInitials(unit.tenantName);
-                      const avatarColor = getAvatarColor(unit.tenantName);
+                      const initials = getInitials(unit.name);
+                      const avatarColor = getAvatarColor(unit.name);
                       return (
-                        <tr
-                          key={unit.id}
-                          className='border-b border-slate-100 last:border-0 hover:bg-slate-50'>
-                          {/* Unit Info */}
-                          <td className='px-4 py-4'>
-                            <div className='flex items-center gap-3'>
-                              <div
-                                className='h-12 w-12 shrink-0 rounded-lg'
-                                style={{
-                                  background:
-                                    "linear-gradient(135deg, #2dd4bf, #3b82f6)",
-                                }}
-                              />
-                              <div>
-                                <p className='font-bold text-slate-900'>
-                                  {unit.unitCode || "Unit"}
-                                </p>
-                                <p className='text-xs text-slate-400'>
-                                  {unit.bedrooms} bed • {unit.bathrooms} bath
-                                  {unit.squareFeet
-                                    ? ` • ${unit.squareFeet} sqft`
-                                    : ""}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
+												<tr
+													key={unit.id}
+													className='border-b border-slate-100 last:border-0 hover:bg-slate-50'>
+													{/* Unit Info */}
+													<td className='px-4 py-4'>
+														<div className='flex items-center gap-3'>
+															<div
+																className='h-12 w-12 shrink-0 rounded-lg'
+																style={{
+																	background:
+																		"linear-gradient(135deg, #2dd4bf, #3b82f6)",
+																}}
+															/>
+															<div>
+																<p className='font-bold text-slate-900'>
+																	{unit.unitCode || "Unit"}
+																</p>
+																<p className='text-xs text-slate-400'>
+																	{unit.bedrooms} bed • {unit.bathrooms}{" "}
+																	bath
+																	{unit.squareFeet
+																		? ` • ${unit.squareFeet} sqft`
+																		: ""}
+																</p>
+															</div>
+														</div>
+													</td>
 
-                          {/* Tenant Details */}
-                          <td className='px-4 py-4'>
-                            {unit.tenantName ? (
-                              <div className='flex items-center gap-2.5'>
-                                <div
-                                  className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white'
-                                  style={{ backgroundColor: avatarColor }}>
-                                  {initials}
-                                </div>
-                                <div>
-                                  <p className='font-semibold text-slate-800'>
-                                    {unit.tenantName}
-                                  </p>
-                                  <p className='text-xs text-slate-400'>
-                                    Primary Tenant
-                                  </p>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className='flex items-center gap-2.5'>
-                                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-500'>
-                                  —
-                                </div>
-                                <div>
-                                  <p className='text-sm font-medium text-slate-400'>
-                                    Not Assigned
-                                  </p>
-                                  <p className='text-xs text-slate-400'>
-                                    Ready for Lease
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-                          </td>
+													{/* Tenant Details */}
+													<td className='px-4 py-4'>
+														{unit.name ? (
+															<div className='flex items-center gap-2.5'>
+																<div
+																	className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white'
+																	style={{ backgroundColor: avatarColor }}>
+																	{initials}
+																</div>
+																<div>
+																	<p className='font-semibold text-slate-800'>
+																		{unit.name}
+																	</p>
+																	<p className='text-xs text-slate-400'>
+																		Primary Tenant
+																	</p>
+																</div>
+															</div>
+														) : (
+															<div className='flex items-center gap-2.5'>
+																<div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-500'>
+																	—
+																</div>
+																<div>
+																	<p className='text-sm font-medium text-slate-400'>
+																		Not Assigned
+																	</p>
+																	<p className='text-xs text-slate-400'>
+																		Ready for Lease
+																	</p>
+																</div>
+															</div>
+														)}
+													</td>
 
-                          {/* Space & Lease */}
-                          <td className='px-4 py-4'>
-                            <p className='font-medium text-slate-700'>
-                              {unit.squareFeet
-                                ? `${Number(unit.squareFeet).toLocaleString()} sq ft`
-                                : "—"}
-                            </p>
-                            <p className='text-xs text-slate-400'>
-                              {unit.leaveDate
-                                ? `Ends ${new Date(unit.leaveDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-                                : status === "occupied"
-                                  ? "Active lease"
-                                  : "Available Now"}
-                            </p>
-                          </td>
+													{/* Space & Lease */}
+													<td className='px-4 py-4'>
+														<p className='font-medium text-slate-700'>
+															{unit.squareFeet
+																? `${Number(unit.squareFeet).toLocaleString()} sq ft`
+																: "—"}
+														</p>
+														<p className='text-xs text-slate-400'>
+															{unit.leaveDate
+																? `Ends ${new Date(unit.leaveDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+																: status === "occupied"
+																	? "Active lease"
+																	: "Available Now"}
+														</p>
+													</td>
 
-                          {/* Status */}
-                          <td className='px-4 py-4'>
-                            {status === "occupied" && (
-                              <span className='inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700'>
-                                <span className='h-1.5 w-1.5 rounded-full bg-green-500' />
-                                OCCUPIED
-                              </span>
-                            )}
-                            {status === "vacant" && (
-                              <span className='inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600'>
-                                <span className='h-1.5 w-1.5 rounded-full bg-red-500' />
-                                VACANT
-                              </span>
-                            )}
-                            {status === "maintenance" && (
-                              <span className='inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700'>
-                                <span className='h-1.5 w-1.5 rounded-full bg-purple-500' />
-                                MAINTENANCE
-                              </span>
-                            )}
-                          </td>
+													{/* Status */}
+													<td className='px-4 py-4'>
+														{status === "occupied" && (
+															<span className='inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700'>
+																<span className='h-1.5 w-1.5 rounded-full bg-green-500' />
+																OCCUPIED
+															</span>
+														)}
+														{status === "vacant" && (
+															<span className='inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600'>
+																<span className='h-1.5 w-1.5 rounded-full bg-red-500' />
+																VACANT
+															</span>
+														)}
+														{status === "maintenance" && (
+															<span className='inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700'>
+																<span className='h-1.5 w-1.5 rounded-full bg-purple-500' />
+																MAINTENANCE
+															</span>
+														)}
+													</td>
 
-                          {/* Actions */}
-                          <td className='px-4 py-4'>
-                            <div className='flex flex-wrap items-center gap-2'>
-                              {unit.tenantName ? (
-                                unit.leaveDate ? (
-                                  <button
-                                    type='button'
-                                    disabled
-                                    className='cursor-not-allowed rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-600 opacity-70'>
-                                    Leaving
-                                  </button>
-                                ) : (
-                                  <button
-                                    type='button'
-                                    onClick={() => openModal("remove", unit)}
-                                    className='rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100'>
-                                    Remove Tenant
-                                  </button>
-                                )
-                              ) : (
-                                <button
-                                  type='button'
-                                  onClick={() => openModal("add", unit)}
-                                  className='rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100'>
-                                  Add Tenant
-                                </button>
-                              )}
-                              <Link
-                                href={`/Units/${unit.id}`}
-                                className='rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>
-                                View Details
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      );
+													{/* Actions */}
+													<td className='px-4 py-4'>
+														<div className='flex flex-wrap items-center gap-2'>
+															{unit.name ? (
+																unit.leaveDate ? (
+																	<button
+																		type='button'
+																		disabled
+																		className='cursor-not-allowed rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-600 opacity-70'>
+																		Leaving
+																	</button>
+																) : (
+																	<button
+																		type='button'
+																		onClick={() => openModal("remove", unit)}
+																		className='rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100'>
+																		Remove Tenant
+																	</button>
+																)
+															) : (
+																<button
+																	type='button'
+																	onClick={() => openModal("add", unit)}
+																	className='rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100'>
+																	Add Tenant
+																</button>
+															)}
+															<Link
+																href={`/Units/${unit.id}`}
+																className='rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>
+																View Details
+															</Link>
+														</div>
+													</td>
+												</tr>
+											);
                     })}
                   </tbody>
                 </table>
