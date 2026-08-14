@@ -719,7 +719,8 @@ console.log(unit)
                 </ol>
               </article>
 
-              <article
+              {/* snapshot nice to keep maybe for future */}
+              {/* <article
                 className='rounded-3xl border p-5 text-white'
                 style={{
                   borderColor: "#0d3569",
@@ -737,7 +738,7 @@ console.log(unit)
                   Current lease status: {leaseStatus}. Unit created:{" "}
                   {formatDate(unit.createdAt)}.
                 </p>
-              </article>
+              </article> */}
             </aside>
           </section>
         </>

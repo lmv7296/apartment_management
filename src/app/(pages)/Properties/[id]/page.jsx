@@ -6,9 +6,11 @@ import { useRouter, useParams } from "next/navigation";
 import { useSession } from "@/app/providers";
 import { APP_ROUTES } from "@/config/routes";
 import userPreferences from "@/config/user-preferences.json";
-import AddTenantModal from "@/app/components/modals/AddTenantModal";
-import RemoveTenantModal from "@/app/components/modals/RemoveTenantModal";
-import AddUnitModal from "@/app/components/modals/AddUnitModal";
+import PropertyModalsContainer from "@/app/components/modals/PropertyModalsContainer";
+import TableWithSearch from "@/app/components/Table-with-search";
+import { exportToCSV } from "@/app/components/exportToCSV";
+import KpiCard from "@/app/components/KpiCard";
+import { normalizeUnit, getUnitStatus, getInitials, getAvatarColor } from "@/utils/propertyUtils";
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
@@ -30,6 +32,7 @@ export default function PropertyDetailsPage() {
   const [userCurrency, setUserCurrency] = React.useState(
     userPreferences.defaultSettings.currency,
   );
+  const [userAreaUnit, setUserAreaUnit] = React.useState("sq ft");
   const [formData, setFormData] = React.useState({
     add: {
       fullName: "",
@@ -273,6 +276,9 @@ export default function PropertyDetailsPage() {
             },
           }));
         }
+        if (data?.areaUnit || data?.area_unit) {
+          setUserAreaUnit(data.areaUnit || data.area_unit);
+        }
       } catch (err) {
         console.error("Failed to load user settings:", err);
       } finally {
@@ -334,49 +340,7 @@ export default function PropertyDetailsPage() {
     }
   }, [status, session?.user?.id, router, fetchUnits]);
 
-function normalizeUnit(unitData) {
-  if (!unitData || typeof unitData !== "object") return null;
 
-  const tenantName =
-    unitData.tenantName ||
-    unitData.name ||
-    unitData.tenant_name ||
-    unitData.assignedTenantName ||
-    unitData.assigned_tenant_name ||
-    null;
-  const tenantEmail = unitData.tenantEmail || unitData.email || unitData.tenant_email || null;
-  const tenantPhone = unitData.tenantPhone || unitData.phone || unitData.tenant_phone || null;
-  const leaveDate = unitData.leaveDate || unitData.leave_date || null;
-  const leaseStartDate = unitData.leaseStartDate || unitData.start_date || null;
-  const leaseEndDate = unitData.leaseEndDate || unitData.end_date || null;
-  const monthlyRent = unitData.monthlyRent ?? (unitData.monthly_rent != null ? Number(unitData.monthly_rent) : null);
-  const squareFeet = unitData.squareFeet ?? unitData.square_feet ?? null;
-  const unitCode = unitData.unitCode || unitData.unit_code || unitData.code || "Unit";
-  const propertyId = unitData.propertyId || unitData.property_id || null;
-
-  return {
-    ...unitData,
-    id: unitData.id,
-    unitCode,
-    unit_code: unitCode,
-    propertyId,
-    property_id: propertyId,
-    bedrooms: unitData.bedrooms ?? unitData.bedroom_count ?? 0,
-    bathrooms: unitData.bathrooms ?? unitData.bathroom_count ?? 1,
-    squareFeet,
-    square_feet: squareFeet,
-    monthlyRent,
-    monthly_rent: monthlyRent,
-    tenantName,
-    tenantEmail,
-    tenantPhone,
-    name: tenantName,
-    leaveDate,
-    leave_date: leaveDate,
-    leaseStartDate,
-    leaseEndDate,
-  };
-}
 
 
 
@@ -399,35 +363,7 @@ function normalizeUnit(unitData) {
     setCurrentPage(1);
   }, [unitFilter, searchQuery]);
 
-  function getUnitStatus(unit) {
-    if (!unit.name) return "vacant";
-    if (unit.leaveDate) return "maintenance";
-    return "occupied";
-  }
 
-  function getAvatarColor(name) {
-    const AVATAR_COLORS = [
-      "#1d4ed8",
-      "#7c3aed",
-      "#059669",
-      "#b45309",
-      "#dc2626",
-    ];
-    if (!name) return "#94a3b8";
-    let hash = 0;
-    for (let i = 0; i < name.length; i++)
-      hash = (hash << 5) - hash + name.charCodeAt(i);
-    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-  }
-
-
-  function getInitials(name) {
-    if (!name) return "?";
-    const parts = name.trim().split(/\s+/);
-    return parts.length >= 2
-      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-      : name.slice(0, 2).toUpperCase();
-  }
   
 
   const occupiedCount = allUnits.filter(
@@ -466,6 +402,23 @@ function normalizeUnit(unitData) {
     (safePage - 1) * ITEMS_PER_PAGE,
     safePage * ITEMS_PER_PAGE,
   );
+  function handleExportCSV() {
+    if (!allUnits || allUnits.length === 0) return;
+
+    const exportData = allUnits.map((u) => ({
+      "Unit Code": u.unitCode || u.unit_code || "—",
+      "Bedrooms": u.bedrooms ?? 0,
+      "Bathrooms": u.bathrooms ?? 0,
+      "Square Feet": u.square_feet || u.squareFeet || "—",
+      "Tenant Name": u.name || "Not Assigned",
+      "Tenant Email": u.email || "—",
+      "Lease End Date": u.end_date || u.endDate
+        ? new Date(u.end_date || u.endDate).toLocaleDateString()
+        : "Available Now",
+    }));
+
+    exportToCSV(exportData, `${property?.name || "property_units"}_export.csv`);
+  }
 
   return (
     <main className='min-h-screen bg-slate-50 px-6 py-6'>
@@ -508,9 +461,11 @@ function normalizeUnit(unitData) {
             <div className='flex items-center gap-3'>
               <button
                 type='button'
-                className='flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50'>
+                onClick={handleExportCSV}
+                disabled={!allUnits || allUnits.length === 0}
+                className='flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 cursor-pointer'>
                 <svg
-                  className='h-4 w-4'
+                  className='h-4 w-4 text-emerald-600'
                   viewBox='0 0 20 20'
                   fill='currentColor'>
                   <path
@@ -524,7 +479,7 @@ function normalizeUnit(unitData) {
               <button
                 type='button'
                 onClick={() => openModal("addUnit", null)}
-                className='flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold text-white'
+                className='flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold text-white'
                 style={{ backgroundColor: "#0f172a" }}>
                 <svg
                   className='h-4 w-4'
@@ -543,345 +498,47 @@ function normalizeUnit(unitData) {
 
           {/* KPI cards */}
           <div className='mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4'>
-            <div className='rounded-xl border border-slate-200 bg-white p-5'>
-              <p className='text-[11px] font-semibold uppercase tracking-wider text-slate-400'>
-                Occupancy Rate
-              </p>
-              <p className='mt-2 text-2xl font-black text-slate-900'>
-                {occupancyPct}%
-              </p>
-              <p className='mt-1 text-[11px] text-slate-400'>
-                {occupiedCount} of {allUnits.length} units
-              </p>
-            </div>
-
-            <div
-              className='rounded-xl border border-slate-200 bg-white p-5'
-              style={{ borderLeftWidth: 4, borderLeftColor: "#10b981" }}>
-              <p className='text-[11px] font-semibold uppercase tracking-wider text-slate-400'>
-                Annual Revenue
-              </p>
-              <p className='mt-2 text-2xl font-black text-slate-900'>—</p>
-              <p className='mt-1 text-[11px] text-slate-400'>No revenue data</p>
-            </div>
-
-            <div className='rounded-xl border border-slate-200 bg-white p-5'>
-              <p className='text-[11px] font-semibold uppercase tracking-wider text-slate-400'>
-                Total Units
-              </p>
-              <p className='mt-2 text-2xl font-black text-slate-900'>
-                {allUnits.length}
-              </p>
-              <p className='mt-1 text-[11px] text-slate-400'>
-                {vacantCount} vacant
-              </p>
-            </div>
-
-            <div className='rounded-xl border border-slate-200 bg-white p-5'>
-              <p className='text-[11px] font-semibold uppercase tracking-wider text-slate-400'>
-                Avg. Lease Term
-              </p>
-              <p className='mt-2 text-2xl font-black text-slate-900'>—</p>
-              <p className='mt-1 text-[11px] text-slate-400'>No lease data</p>
-            </div>
+            <KpiCard
+              title="Occupancy Rate"
+              value={`${occupancyPct}%`}
+              subtitle={`${occupiedCount} of ${allUnits.length} units`}
+            />
+            <KpiCard
+              title="Annual Revenue"
+              value="—"
+              subtitle="No revenue data"
+              accentColor="#10b981"
+            />
+            <KpiCard
+              title="Total Units"
+              value={allUnits.length}
+              subtitle={`${vacantCount} vacant`}
+            />
+            <KpiCard
+              title="Avg. Lease Term"
+              value="—"
+              subtitle="No lease data"
+            />
           </div>
 
           {/* Units panel */}
-          <div className='rounded-xl border border-slate-200 bg-white'>
-            {/* Search + filter bar */}
-            <div className='flex flex-wrap items-center gap-3 border-b border-slate-100 px-4 py-3'>
-              <div className='relative min-w-[200px] flex-1'>
-                <svg
-                  className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400'
-                  viewBox='0 0 20 20'
-                  fill='currentColor'>
-                  <path
-                    fillRule='evenodd'
-                    d='M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z'
-                    clipRule='evenodd'
-                  />
-                </svg>
-                <input
-                  type='text'
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder='Search by unit, tenant'
-                  className='w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-200'
-                />
-              </div>
-              <div className='flex flex-wrap gap-2'>
-                {[
-                  { key: "all", label: `All Units (${allUnits.length})` },
-                  { key: "occupied", label: `Occupied (${occupiedCount})` },
-                  { key: "vacant", label: `Vacant (${vacantCount})` },
-                  {
-                    key: "maintenance",
-                    label: `Maintenance (${maintenanceCount})`,
-                  },
-                ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    type='button'
-                    onClick={() => setUnitFilter(tab.key)}
-                    className='rounded-full px-4 py-1.5 text-sm font-semibold transition'
-                    style={
-                      unitFilter === tab.key
-                        ? { backgroundColor: "#0f172a", color: "#fff" }
-                        : { backgroundColor: "#f1f5f9", color: "#475569" }
-                    }>
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Table */}
-            {loading ? (
-              <div className='py-12 text-center text-sm text-slate-400'>
-                Loading units...
-              </div>
-            ) : paginatedUnits.length === 0 ? (
-              <div className='py-12 text-center text-sm text-slate-400'>
-                {searchQuery || unitFilter !== "all"
-                  ? "No units match your search or filter."
-                  : "No units have been added to this property yet."}
-              </div>
-            ) : (
-              <div className='overflow-x-auto'>
-                <table className='w-full text-sm'>
-                  <thead>
-                    <tr className='border-b border-slate-100'>
-                      {[
-                        "Unit Info",
-                        "Tenant Details",
-                        "Space & Lease",
-                        "Status",
-                        "Actions",
-                      ].map((col) => (
-                        <th
-                          key={col}
-                          className='px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400'>
-                          {col}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedUnits.map((unit) => {
-                      const status = getUnitStatus(unit);
-                      const initials = getInitials(unit.name);
-                      const avatarColor = getAvatarColor(unit.name);
-                      return (
-												<tr
-													key={unit.id}
-													className='border-b border-slate-100 last:border-0 hover:bg-slate-50'>
-													{/* Unit Info */}
-													<td className='px-4 py-4'>
-														<div className='flex items-center gap-3'>
-															<div
-																className='h-12 w-12 shrink-0 rounded-lg'
-																style={{
-																	background:
-																		"linear-gradient(135deg, #2dd4bf, #3b82f6)",
-																}}
-															/>
-															<div>
-																<p className='font-bold text-slate-900'>
-																	{unit.unitCode || "Unit"}
-																</p>
-																<p className='text-xs text-slate-400'>
-																	{unit.bedrooms} bed • {unit.bathrooms}{" "}
-																	bath
-																	{unit.squareFeet
-																		? ` • ${unit.squareFeet} sqft`
-																		: ""}
-																</p>
-															</div>
-														</div>
-													</td>
-
-													{/* Tenant Details */}
-													<td className='px-4 py-4'>
-														{unit.name ? (
-															<div className='flex items-center gap-2.5'>
-																<div
-																	className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white'
-																	style={{ backgroundColor: avatarColor }}>
-																	{initials}
-																</div>
-																<div>
-																	<p className='font-semibold text-slate-800'>
-																		{unit.name}
-																	</p>
-																	<p className='text-xs text-slate-400'>
-																		Primary Tenant
-																	</p>
-																</div>
-															</div>
-														) : (
-															<div className='flex items-center gap-2.5'>
-																<div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-500'>
-																	—
-																</div>
-																<div>
-																	<p className='text-sm font-medium text-slate-400'>
-																		Not Assigned
-																	</p>
-																	<p className='text-xs text-slate-400'>
-																		Ready for Lease
-																	</p>
-																</div>
-															</div>
-														)}
-													</td>
-
-													{/* Space & Lease */}
-													<td className='px-4 py-4'>
-														<p className='font-medium text-slate-700'>
-															{unit.squareFeet
-																? `${Number(unit.squareFeet).toLocaleString()} sq ft`
-																: "—"}
-														</p>
-														<p className='text-xs text-slate-400'>
-															{unit.leaveDate
-																? `Ends ${new Date(unit.leaveDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-																: status === "occupied"
-																	? "Active lease"
-																	: "Available Now"}
-														</p>
-													</td>
-
-													{/* Status */}
-													<td className='px-4 py-4'>
-														{status === "occupied" && (
-															<span className='inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700'>
-																<span className='h-1.5 w-1.5 rounded-full bg-green-500' />
-																OCCUPIED
-															</span>
-														)}
-														{status === "vacant" && (
-															<span className='inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600'>
-																<span className='h-1.5 w-1.5 rounded-full bg-red-500' />
-																VACANT
-															</span>
-														)}
-														{status === "maintenance" && (
-															<span className='inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700'>
-																<span className='h-1.5 w-1.5 rounded-full bg-purple-500' />
-																MAINTENANCE
-															</span>
-														)}
-													</td>
-
-													{/* Actions */}
-													<td className='px-4 py-4'>
-														<div className='flex flex-wrap items-center gap-2'>
-															{unit.name ? (
-																unit.leaveDate ? (
-																	<button
-																		type='button'
-																		disabled
-																		className='cursor-not-allowed rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-600 opacity-70'>
-																		Leaving
-																	</button>
-																) : (
-																	<button
-																		type='button'
-																		onClick={() => openModal("remove", unit)}
-																		className='rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100'>
-																		Remove Tenant
-																	</button>
-																)
-															) : (
-																<button
-																	type='button'
-																	onClick={() => openModal("add", unit)}
-																	className='rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100'>
-																	Add Tenant
-																</button>
-															)}
-															<Link
-																href={`/Units/${unit.id}`}
-																className='rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'>
-																View Details
-															</Link>
-														</div>
-													</td>
-												</tr>
-											);
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Pagination */}
-            {filteredUnits.length > 0 ? (
-              <div className='flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs text-slate-500'>
-                <p>
-                  Showing {(safePage - 1) * ITEMS_PER_PAGE + 1}–
-                  {Math.min(safePage * ITEMS_PER_PAGE, filteredUnits.length)} of{" "}
-                  {filteredUnits.length} units
-                </p>
-                <div className='flex items-center gap-1'>
-                  <button
-                    type='button'
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={safePage === 1}
-                    className='rounded-md border border-slate-200 px-2 py-1 font-bold disabled:opacity-40 hover:bg-slate-50'>
-                    ‹
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter(
-                      (n) =>
-                        n === 1 ||
-                        n === totalPages ||
-                        Math.abs(n - safePage) <= 1,
-                    )
-                    .reduce((acc, n, i, arr) => {
-                      if (i > 0 && n - arr[i - 1] > 1) acc.push("...");
-                      acc.push(n);
-                      return acc;
-                    }, [])
-                    .map((item, i) =>
-                      item === "..." ? (
-                        <span
-                          key={`ellipsis-${i}`}
-                          className='px-1 text-slate-400'>
-                          …
-                        </span>
-                      ) : (
-                        <button
-                          key={item}
-                          type='button'
-                          onClick={() => setCurrentPage(item)}
-                          className='min-w-[28px] rounded-md border px-2 py-1 text-xs font-semibold'
-                          style={
-                            safePage === item
-                              ? {
-                                  backgroundColor: "#0f172a",
-                                  color: "#fff",
-                                  borderColor: "#0f172a",
-                                }
-                              : { borderColor: "#e2e8f0", color: "#475569" }
-                          }>
-                          {item}
-                        </button>
-                      ),
-                    )}
-                  <button
-                    type='button'
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    disabled={safePage === totalPages}
-                    className='rounded-md border border-slate-200 px-2 py-1 font-bold disabled:opacity-40 hover:bg-slate-50'>
-                    ›
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </div>
+          <TableWithSearch
+            type="units"
+            data={allUnits}
+            loading={loading}
+            userAreaUnit={userAreaUnit}
+            openModal={openModal}
+            filterTabs={[
+              { key: "all", label: `All Units (${allUnits.length})` },
+              { key: "occupied", label: `Occupied (${occupiedCount})` },
+              { key: "vacant", label: `Vacant (${vacantCount})` },
+              { key: "maintenance", label: `Maintenance (${maintenanceCount})` },
+            ]}
+            activeFilter={unitFilter}
+            onFilterChange={setUnitFilter}
+            searchPlaceholder="Search by unit number, tenant..."
+            emptyMessage="No units have been added to this property yet."
+          />
 
           {/* Toast */}
           {actionMessage ? (
@@ -904,31 +561,14 @@ function normalizeUnit(unitData) {
             </div>
           ) : null}
 
-          <AddTenantModal
-            isOpen={modalMode === "add"}
+          <PropertyModalsContainer
+            modalMode={modalMode}
             onClose={closeModal}
             activeUnit={activeUnit}
-            formData={formData.add}
+            formData={formData}
             onChangeForm={onChangeForm}
-            onSubmit={submitForm}
+            onSubmitForm={submitForm}
             userCurrency={userCurrency}
-          />
-
-          <RemoveTenantModal
-            isOpen={modalMode === "remove"}
-            onClose={closeModal}
-            activeUnit={activeUnit}
-            formData={formData.remove}
-            onChangeForm={onChangeForm}
-            onSubmit={submitForm}
-          />
-
-          <AddUnitModal
-            isOpen={modalMode === "addUnit"}
-            onClose={closeModal}
-            formData={formData.addUnit}
-            onChangeForm={onChangeForm}
-            onSubmit={submitForm}
           />
         </>
       ) : null}

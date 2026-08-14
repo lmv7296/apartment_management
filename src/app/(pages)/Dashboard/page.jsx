@@ -23,11 +23,9 @@ export default function Dashboard() {
     return null;
   }
 
-  if (status === "unauthenticated") {
-    return null;
-  }
 
   if (role === "manager") {
+    
     return <ManagerDashboard />;
   }
 
