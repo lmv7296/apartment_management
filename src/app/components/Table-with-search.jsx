@@ -30,9 +30,22 @@ export default function TableWithSearch({
       const q = searchQuery.trim().toLowerCase();
 
       // Tab filter for units
-      if (type === "units" && activeFilter !== "all") {
+      if (type === "units" && activeFilter && activeFilter !== "all") {
         const status = getUnitStatus(item);
         if (status !== activeFilter) return false;
+      }
+
+      // Tab filter for tenants
+      if (type === "tenants" && activeFilter) {
+        const isAssigned = Boolean(item.unit_code || item.unitCode || item.assigned_unit);
+         const isOverdue = item.payment_status === "overdue" || (item.balance && item.balance > 0);
+        const isArchived = item.active === false;
+
+        if (activeFilter === "assigned" && (!isAssigned || isArchived)) return false;
+        if (activeFilter === "unassigned" && (isAssigned || isArchived)) return false;
+         if (activeFilter === "overdue" && (!isOverdue || isArchived)) return false;
+        if (activeFilter === "archived" && !isArchived) return false;
+        if (activeFilter === "all" && isArchived) return false;
       }
 
       if (!q) return true;
@@ -51,6 +64,16 @@ export default function TableWithSearch({
           (item.unitCode || item.unit_code || "").toLowerCase().includes(q) ||
           (item.name || "").toLowerCase().includes(q) ||
           (item.email || "").toLowerCase().includes(q)
+        );
+      }
+
+      if (type === "tenants") {
+        return (
+          (item.name || item.fullName || "").toLowerCase().includes(q) ||
+          (item.email || "").toLowerCase().includes(q) ||
+          (item.phone || "").toLowerCase().includes(q) ||
+          (item.unit_code || item.unitCode || "").toLowerCase().includes(q) ||
+          (item.property_name || item.propertyName || "").toLowerCase().includes(q)
         );
       }
 
@@ -84,6 +107,9 @@ export default function TableWithSearch({
     }
     if (type === "units") {
       return ["Unit Info", "Tenant Details", "Space & Lease", "Status", "Actions"];
+    }
+    if (type === "tenants") {
+      return ["Tenant", "Contact Info", "Assigned Unit", "Actions"];
     }
     return [];
   }, [columns, type]);
