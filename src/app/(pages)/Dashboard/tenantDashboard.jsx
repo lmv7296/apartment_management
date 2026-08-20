@@ -1,13 +1,16 @@
 "use client";
 
 import React from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import { useRouter } from "next/navigation";
 import KpiRow from "@/app/components/dashboard/KpiRow";
 import QuickActions from "@/app/components/dashboard/QuickActions";
 import BuildingsUnitsPanel from "@/app/components/dashboard/BuildingsUnitsPanel";
 import roleSettings from "@/config/role-settings.json";
 import { APP_ROUTES } from "@/config/routes";
+
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
 export default function TenantDashboard() {
   const { data: session, status } = useSession();
@@ -36,8 +39,11 @@ export default function TenantDashboard() {
       setLoadError("");
 
       try {
-        const response = await fetch("/api/v1/dashboard", {
+        const response = await fetch(`${BACKEND_URL}/api/v1/dashboard`, {
           cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || "",
+          },
         });
 
         if (!response.ok) {

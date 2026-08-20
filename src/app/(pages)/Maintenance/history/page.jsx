@@ -1,10 +1,12 @@
 "use client";
 
 import React from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import { useSearchParams } from "next/navigation";
 
-export default function MaintenanceHistoryPage() {
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
+function MaintenanceHistoryContent() {
   const { data: session } = useSession();
   const params = useSearchParams();
   const unitId = params.get("unit") || "";
@@ -25,9 +27,14 @@ export default function MaintenanceHistoryPage() {
 
       try {
         const url = unitId
-          ? `/api/v1/maintenance?unit=${encodeURIComponent(unitId)}`
-          : "/api/v1/maintenance";
-        const response = await fetch(url, { cache: "no-store" });
+          ? `${BACKEND_URL}/api/v1/maintenance?unit=${encodeURIComponent(unitId)}`
+          : `${BACKEND_URL}/api/v1/maintenance`;
+        const response = await fetch(url, {
+          cache: "no-store",
+          headers: {
+            "x-user-id": session?.user?.id || "",
+          },
+        });
         const payload = await response.json();
 
         if (!response.ok) {
@@ -76,10 +83,11 @@ export default function MaintenanceHistoryPage() {
     setSavingId(id);
 
     try {
-      const response = await fetch("/api/v1/maintenance", {
+      const response = await fetch(`${BACKEND_URL}/api/v1/maintenance`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          "x-user-id": session?.user?.id || "",
         },
         body: JSON.stringify({ id, status: nextStatus }),
       });
@@ -213,3 +221,13 @@ export default function MaintenanceHistoryPage() {
     </main>
   );
 }
+
+export default function MaintenanceHistoryPage() {
+  return (
+    <React.Suspense fallback={<p className='text-sm app-text-muted'>Loading...</p>}>
+      <MaintenanceHistoryContent />
+    </React.Suspense>
+  );
+}
+
+export const dynamic = "force-dynamic";

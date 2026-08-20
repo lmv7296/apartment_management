@@ -1,8 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSession } from "@/app/providers";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
 export default function NotifyPaymentPage() {
+  const { data: session } = useSession();
   const [receiptFile, setReceiptFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -59,7 +63,12 @@ export default function NotifyPaymentPage() {
     async function fetchTenants() {
       try {
         const response = await fetch(
-          "/api/v1/Tenants?fields=name,apartment_id,id",
+          `${BACKEND_URL}/api/v1/tenants?fields=name,apartment_id,id`,
+          {
+            headers: {
+              "x-user-id": session?.user?.id || ""
+            }
+          }
         );
         if (!response.ok) throw new Error("Failed to fetch tenant data.");
         const data = await response.json();
@@ -68,8 +77,10 @@ export default function NotifyPaymentPage() {
         console.error("Error fetching tenants:", error);
       }
     }
-    fetchTenants();
-  }, []);
+    if (session?.user?.id) {
+      fetchTenants();
+    }
+  }, [session?.user?.id]);
   return (
     <main className='mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8'>
       <section

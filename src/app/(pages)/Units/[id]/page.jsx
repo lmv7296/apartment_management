@@ -3,10 +3,13 @@
 import React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/app/providers";
 import { APP_ROUTES } from "@/config/routes";
 import { formatMoney } from "@/utils/formatters/formatMoney";
 import ExtendLeaseModal from "@/app/components/modals/ExtendLeaseModal";
+import AssignTenantModal from "@/app/components/modals/AssignTenantModal";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 
 function formatDate(value) {
   if (!value) return "N/A";
@@ -71,13 +74,242 @@ function maintenanceTone(status) {
   return "warning";
 }
 
+function normalizeUnit(rawInput) {
+  let unitData = rawInput;
+  if (Array.isArray(unitData)) {
+    unitData = unitData[0];
+  } else if (unitData && typeof unitData === "object") {
+    if (Array.isArray(unitData.data)) unitData = unitData.data[0];
+    else if (Array.isArray(unitData.units)) unitData = unitData.units[0];
+    else if (unitData.unit && typeof unitData.unit === "object") unitData = unitData.unit;
+  }
+  if (!unitData || typeof unitData !== "object") return null;
+
+  const tenantName = unitData.tenantName || unitData.name || unitData.tenant_name || null;
+  const tenantEmail = unitData.tenantEmail || unitData.email || unitData.tenant_email || null;
+  const tenantPhone = unitData.tenantPhone || unitData.phone || unitData.tenant_phone || null;
+  const leaseStartDate = unitData.leaseStartDate || unitData.start_date || null;
+  const leaseEndDate = unitData.leaseEndDate || unitData.end_date || null;
+  const monthlyRent = unitData.monthlyRent ?? (unitData.monthly_rent != null ? Number(unitData.monthly_rent) : null);
+  const squareFeet = unitData.squareFeet ?? unitData.square_feet ?? null;
+  const unitCode = unitData.unitCode || unitData.unit_code || "N/A";
+  const propertyId = unitData.propertyId || unitData.property_id || null;
+  const propertyName = unitData.propertyName || unitData.property_name || "Residence";
+  const rawStatus = unitData.leaseStatus || unitData.lease_status || unitData.status;
+  const leaseStatus = rawStatus || (tenantName || leaseStartDate ? "active" : "vacant");
+
+  const leaseHistory = Array.isArray(unitData.leaseHistory) && unitData.leaseHistory.length > 0
+    ? unitData.leaseHistory.map((item) => ({
+        id: item.id,
+        startDate: item.startDate || item.start_date,
+        endDate: item.endDate || item.end_date,
+        tenantName: item.tenantName || item.name || item.tenant_name,
+        monthlyRent: item.monthlyRent ?? (item.monthly_rent != null ? Number(item.monthly_rent) : null),
+        status: item.status || item.lease_status || "active",
+      }))
+    : (leaseStartDate || tenantName)
+      ? [
+          {
+            id: unitData.id || "1",
+            startDate: leaseStartDate,
+            endDate: leaseEndDate,
+            tenantName: tenantName || "Tenant",
+            monthlyRent: monthlyRent,
+            status: leaseStatus,
+          },
+        ]
+      : [];
+
+  return {
+    ...unitData,
+    id: unitData.id,
+    unitCode,
+    unit_code: unitCode,
+    propertyId,
+    property_id: propertyId,
+    propertyName,
+    property_name: propertyName,
+    monthlyRent,
+    monthly_rent: monthlyRent,
+    squareFeet,
+    square_feet: squareFeet,
+    bedrooms: unitData.bedrooms ?? unitData.bedroom_count ?? 0,
+    bathrooms: unitData.bathrooms ?? unitData.bathroom_count ?? 0,
+    tenantName,
+    tenantEmail,
+    tenantPhone,
+    leaseStartDate,
+    leaseEndDate,
+    leaseStatus,
+    leaseHistory,
+  };
+}
+
+function getUnitFromLocalStorage(unitId) {
+  if (typeof window === "undefined" || !window.localStorage) return null;
+
+  const searchId = String(unitId || "").toLowerCase();
+
+  const findInArray = (arr) => {
+    if (!Array.isArray(arr)) return null;
+    return arr.find((u) => {
+      if (!u || typeof u !== "object") return false;
+      return (
+        String(u.id || "").toLowerCase() === searchId ||
+        String(u.unit_code || u.unitCode || u.code || "").toLowerCase() === searchId
+      );
+    });
+  };
+
+  const keysToTry = [
+    `unit_${unitId}`,
+    "unit",
+    "selectedUnit",
+    "currentUnit",
+    "units",
+    "properties",
+    "apartments",
+  ];
+
+  for (const key of keysToTry) {
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const found = findInArray(parsed);
+        if (found) return found;
+      } else if (parsed && typeof parsed === "object") {
+        if (
+          String(parsed.id || "").toLowerCase() === searchId ||
+          String(parsed.unit_code || parsed.unitCode || parsed.code || "").toLowerCase() === searchId
+        ) {
+          return parsed;
+        }
+
+        const subList = parsed.units || parsed.data || parsed.apartments || parsed.properties;
+        if (Array.isArray(subList)) {
+          const found = findInArray(subList);
+          if (found) return found;
+
+          for (const item of subList) {
+            const nestedUnits = item?.units || item?.apartments;
+            const nestedFound = findInArray(nestedUnits);
+            if (nestedFound) {
+              return {
+                ...nestedFound,
+                property_name: nestedFound.property_name || item.name || item.title || item.propertyName,
+                property_id: nestedFound.property_id || item.id || item.propertyId,
+              };
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  return null;
+}
+
 export default function UnitDetailsPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
   const unitId = params?.id;
 
-  // Don't render anything if params are not available yet
+  const [unit, setUnit] = React.useState(null);
+  const [maintenanceHistory, setMaintenanceHistory] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState("");
+  const [extendLeaseModalOpen, setExtendLeaseModalOpen] = React.useState(false);
+  const [assignTenantModalOpen, setAssignTenantModalOpen] = React.useState(false);
+  const [isExtendingLease, setIsExtendingLease] = React.useState(false);
+
+  const handleCloseExtendLeaseModal = React.useCallback(() => {
+    setExtendLeaseModalOpen(false);
+  }, []);
+
+  const handleCloseAssignTenantModal = React.useCallback(() => {
+    setAssignTenantModalOpen(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace(APP_ROUTES.login);
+    }
+  }, [status, router]);
+
+  React.useEffect(() => {
+    if (status !== "authenticated" || !session?.user?.id || !unitId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadUnit() {
+      try {
+        if (!cancelled) {
+          setLoading(true);
+          setError("");
+        }
+
+        // Try localStorage initial data if available
+        const cachedUnit = getUnitFromLocalStorage(unitId);
+        if (cachedUnit && !cancelled) {
+          setUnit(normalizeUnit(cachedUnit));
+        }
+
+        const unitResponse = await fetch(`${BACKEND_URL}/api/v1/units/${unitId}`, {
+          cache: "no-store",
+          headers: {
+            "x-user-id": session.user.id,
+          },
+        });
+
+        const maintenanceResponse = await fetch(`${BACKEND_URL}/api/v1/maintenance?unit=${unitId}`, {
+          cache: "no-store",
+          headers: {
+            "x-user-id": session.user.id,
+          },
+        }).catch(() => null);
+
+        if (unitResponse.ok) {
+          const dataUnits = await unitResponse.json();
+          if (!cancelled) {
+            setUnit(normalizeUnit(dataUnits));
+          }
+        } else if (!cachedUnit) {
+          const dataUnits = await unitResponse.json().catch(() => ({}));
+          throw new Error(dataUnits?.detail || dataUnits?.error || "Failed to load unit");
+        }
+
+        if (maintenanceResponse && maintenanceResponse.ok) {
+          const maintenanceData = await maintenanceResponse.json();
+          if (!cancelled) {
+            setMaintenanceHistory(
+              Array.isArray(maintenanceData?.items) ? maintenanceData.items : [],
+            );
+          }
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError.message || "Failed to load unit");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadUnit();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [unitId, status, session?.user?.id]);
+
+  // Don't render details if params are not available yet
   if (!unitId) {
     return (
       <main className='mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8'>
@@ -93,81 +325,15 @@ export default function UnitDetailsPage() {
     );
   }
 
-  const [unit, setUnit] = React.useState(null);
-  const [maintenanceHistory, setMaintenanceHistory] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState("");
-  const [extendLeaseModalOpen, setExtendLeaseModalOpen] = React.useState(false);
-  const [isExtendingLease, setIsExtendingLease] = React.useState(false);
-
-  const handleCloseExtendLeaseModal = React.useCallback(() => {
-    setExtendLeaseModalOpen(false);
-  }, []);
-
-  React.useEffect(() => {
-    if (status === "unauthenticated") {
-      router.replace(APP_ROUTES.login);
-      return;
-    }
-
-    if (status !== "authenticated") {
-      return;
-    }
-
-    async function loadUnit() {
-      try {
-        setLoading(true);
-        setError("");
-
-        if (!unitId) {
-          throw new Error("Unit id is required");
-        }
-
-        const [unitResponse, maintenanceResponse] = await Promise.all([
-          fetch(`/api/v1/units/${unitId}`, {
-            cache: "no-store",
-          }),
-          fetch(`/api/v1/maintenance?unit=${unitId}`, {
-            cache: "no-store",
-          }),
-        ]);
-
-        const data = await unitResponse.json();
-
-        if (!unitResponse.ok) {
-          throw new Error(data?.detail || data?.error || "Failed to load unit");
-        }
-
-        setUnit(data);
-
-        if (maintenanceResponse.ok) {
-          const maintenanceData = await maintenanceResponse.json();
-          setMaintenanceHistory(
-            Array.isArray(maintenanceData?.items) ? maintenanceData.items : [],
-          );
-        } else {
-          setMaintenanceHistory([]);
-        }
-      } catch (loadError) {
-        setUnit(null);
-        setMaintenanceHistory([]);
-        setError(loadError.message || "Failed to load unit");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadUnit();
-  }, [unitId, router, status]);
-
   const handleExtendLease = async (newEndDate) => {
     try {
       setIsExtendingLease(true);
       setError("");
-      const response = await fetch(`/api/v1/units/${unitId}/extend-lease`, {
+      const response = await fetch(`${BACKEND_URL}/api/v1/units/${unitId}/extend-lease`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          "x-user-id": session?.user?.id || ""
         },
         body: JSON.stringify({ endDate: newEndDate }),
       });
@@ -180,13 +346,27 @@ export default function UnitDetailsPage() {
         throw new Error(errorMessage);
       }
 
-      // Reload the unit data
-      const unitResponse = await fetch(`/api/v1/units/${unitId}`, {
+      // Reload unit data from backend and pass through normalizeUnit
+      const unitResponse = await fetch(`${BACKEND_URL}/api/v1/units/${unitId}`, {
         cache: "no-store",
+        headers: {
+          "x-user-id": session?.user?.id || "",
+        },
       });
+
       if (unitResponse.ok) {
         const updatedUnit = await unitResponse.json();
-        setUnit(updatedUnit);
+        setUnit(normalizeUnit(updatedUnit));
+      } else {
+        setUnit((prev) =>
+          prev
+            ? normalizeUnit({
+                ...prev,
+                leaseEndDate: newEndDate,
+                end_date: newEndDate,
+              })
+            : prev,
+        );
       }
 
       setExtendLeaseModalOpen(false);
@@ -205,7 +385,7 @@ export default function UnitDetailsPage() {
   const leaseHistory = Array.isArray(unit?.leaseHistory)
     ? unit.leaseHistory
     : [];
-
+console.log(unit)
   return (
     <main className='mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8'>
       {loading ? (
@@ -244,10 +424,10 @@ export default function UnitDetailsPage() {
                 </Link>{" "}
                 <span className='mx-2'>›</span>
                 <span className='font-semibold'>
-                  {unit.propertyName || "Property"}
+                  {unit.unit_code || "Unit"}
                 </span>{" "}
                 <span className='mx-2'>›</span>
-                <span className='font-bold'>{unit.unitCode || "N/A"}</span>
+                <span className='font-bold'>{unit.unit_code || "N/A"}</span>
               </p>
               <div className='flex flex-wrap gap-2'>
                 <Link
@@ -276,25 +456,21 @@ export default function UnitDetailsPage() {
             <div className='flex flex-wrap items-start justify-between gap-4'>
               <div>
                 <h1 className='text-3xl font-black leading-tight sm:text-5xl'>
-                  {unit.unitCode || "N/A"} - {unit.propertyName || "Residence"}
+                 Apartment {unit.unit_code || "N/A"}
                 </h1>
-                <p className='mt-2 text-sm sm:text-base app-text-muted'>
-                  {unit.propertyAddress || "Address unavailable"}
-                  {unit.propertyCity ? `, ${unit.propertyCity}` : ""}
-                  {unit.propertyState ? `, ${unit.propertyState}` : ""}
-                </p>
               </div>
 
               <div className='flex flex-wrap gap-2'>
-                <button
-                  type='button'
-                  className='rounded-xl border px-4 py-2 text-sm font-bold'
-                  style={{
-                    borderColor: "var(--border)",
-                    backgroundColor: "var(--surface-2)",
+                {unit.leaseHistory.active ? (
+                  <button
+                    type='button'
+                    onClick={() => setAssignTenantModalOpen(true)}
+                    className='rounded-xl px-4 py-2 text-sm font-bold text-white'
+                    style={{
+                      background: "linear-gradient(90deg, #16a34a, #059669)",
                   }}>
-                  Edit Details
-                </button>
+                  Assign Tenant
+                </button>) : null}
                 <button
                   type='button'
                   onClick={() => setExtendLeaseModalOpen(true)}
@@ -543,7 +719,8 @@ export default function UnitDetailsPage() {
                 </ol>
               </article>
 
-              <article
+              {/* snapshot nice to keep maybe for future */}
+              {/* <article
                 className='rounded-3xl border p-5 text-white'
                 style={{
                   borderColor: "#0d3569",
@@ -561,24 +738,47 @@ export default function UnitDetailsPage() {
                   Current lease status: {leaseStatus}. Unit created:{" "}
                   {formatDate(unit.createdAt)}.
                 </p>
-              </article>
+              </article> */}
             </aside>
           </section>
         </>
       ) : null}
 
       {unit && (
-        <ExtendLeaseModal
-          isSubmitting={isExtendingLease}
-          isOpen={extendLeaseModalOpen}
-          onClose={handleCloseExtendLeaseModal}
-          currentEndDate={
-            unit?.leaseEndDate
-              ? new Date(unit.leaseEndDate).toISOString().split("T")[0]
-              : ""
-          }
-          onSubmit={handleExtendLease}
-        />
+        <>
+          <ExtendLeaseModal
+            isSubmitting={isExtendingLease}
+            isOpen={extendLeaseModalOpen}
+            onClose={handleCloseExtendLeaseModal}
+            currentEndDate={
+              unit?.leaseEndDate
+                ? new Date(unit.leaseEndDate).toISOString().split("T")[0]
+                : ""
+            }
+            onSubmit={handleExtendLease}
+          />
+          <AssignTenantModal
+            isOpen={assignTenantModalOpen}
+            onClose={handleCloseAssignTenantModal}
+            unitId={unitId}
+            unitCode={unit.unitCode}
+            session={session}
+            onSuccess={() => {
+              // Refresh unit data after successful tenant assignment
+              if (session?.user?.id && unitId) {
+                fetch(`${BACKEND_URL}/api/v1/units/${unitId}`, {
+                  cache: "no-store",
+                  headers: {
+                    "x-user-id": session.user.id,
+                  },
+                })
+                  .then((res) => res.json())
+                  .then((data) => setUnit(normalizeUnit(data)))
+                  .catch(console.error);
+              }
+            }}
+          />
+        </>
       )}
     </main>
   );
