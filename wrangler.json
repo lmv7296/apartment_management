@@ -5,10 +5,5 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
-  "assets": {
-    "directory": ".next",
-    "exclude": [
-      "cache/**"
-    ]
-  }
+  "pages_build_output_dir": ".vercel/output/static"
 }

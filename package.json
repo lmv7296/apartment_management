@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --turbopack --hostname 0.0.0.0 --port 3000",
-    "build": "next build && rm -rf .next/cache",
+    "build": "npx @cloudflare/next-on-pages",
     "start": "next start",
     "lint": "next lint",
     "db:reset-user-passwords": "set -a && . ./.env.local && set +a && node scripts/reset-user-passwords.mjs"
@@ -25,6 +25,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.7",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "25.0.3",
