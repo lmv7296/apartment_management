@@ -6,9 +6,6 @@
     "nodejs_compat"
   ],
   "assets": {
-    "directory": ".next",
-    "exclude": [
-      "cache/**"
-    ]
+    "directory": ".next"
   }
 }
