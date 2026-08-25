@@ -3,3 +3,5 @@ cache/**
 **/cache/**
 *.pack
 *.cache
+_worker.js
+_worker.js/**
