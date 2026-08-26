@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev --turbopack --hostname 0.0.0.0 --port 3000",
     "build": "next build",
-    "build:cf": "npx @cloudflare/next-on-pages",
+    "build:cf": "npx @cloudflare/next-on-pages && echo '_worker.js' > .vercel/output/static/.assetsignore",
     "deploy:pages": "npx wrangler pages deploy .vercel/output/static",
     "start": "next start",
     "lint": "next lint",
