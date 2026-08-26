@@ -1,7 +1,5 @@
 "use client";
 
-export const runtime = "edge";
-
 import { useSession } from "@/app/providers";
 import { useRouter } from "next/navigation";
 import Link from "next/link";

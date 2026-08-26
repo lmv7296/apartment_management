@@ -1,7 +1,5 @@
 "use client";
 
-export const runtime = "edge";
-
 import React from "react";
 import ManagerDashboard from "./managerDashboard";
 import TenantDashboard from "./tenantDashboard";
